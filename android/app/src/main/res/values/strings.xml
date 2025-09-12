@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">YCITY+</string>
+    <string name="appwidget_text">차량 층 정보</string>
+    <string name="widget_description">YCITY+ 차량 주차 층 정보</string>
+</resources>

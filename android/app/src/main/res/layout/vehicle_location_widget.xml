@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="8dp"
+    android:background="#00000000">
+
+    <!-- 층 정보 텍스트 (메인) -->
+    <TextView
+        android:id="@+id/floor_text"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:text="B1"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:textColor="#6B7280"
+        android:fontFamily="sans-serif"
+        android:includeFontPadding="false" />
+
+    <!-- 마지막 업데이트 시간 (작은 텍스트, 큰 위젯에서만 표시) -->
+    <TextView
+        android:id="@+id/update_time_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="방금 전"
+        android:textSize="11sp"
+        android:gravity="center"
+        android:textColor="#CCFFFFFF"
+        android:fontFamily="sans-serif"
+        android:layout_marginTop="2dp"
+        android:visibility="gone" />
+
+</LinearLayout>
