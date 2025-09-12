@@ -660,7 +660,7 @@ Update in `pubspec.yaml`:
 version: 4.0.3+32  # Format: MAJOR.MINOR.PATCH+BUILD
 ```
 
-**Current Version**: 4.0.3+35 (as of latest update)
+**Current Version**: 4.0.3+37 (as of latest update)
 
 ### ⚠️ iOS Code Signing - CRITICAL RULES
 
@@ -855,8 +855,9 @@ All test mode code is protected with `⚠️ cleanup 금지` comments to prevent
 
 ## Important Project Notes
 
-### Recent Critical Updates (v4.0.3+35)
-- **Android Build System Upgrade (Latest - v4.0.3+35)**: Comprehensive modernization of Android build system components - upgraded Gradle (8.3.0→8.7.0), Android Gradle Plugin (8.2.1→8.6.0), Kotlin (1.9.20→2.1.0), and Java target compatibility (8→11), eliminating all 6 build warnings for cleaner development experience
+### Recent Critical Updates (v4.0.3+37)
+- **iOS Widget ATS Fix (Latest - v4.0.3+37)**: Resolved iOS widget background refresh issue by adding NSAppTransportSecurity exception to VehicleLocationWidget/Info.plist, enabling HTTP communication to parking system server (122.199.183.213) for proper background updates when app is closed
+- **Android Build System Upgrade (v4.0.3+35)**: Comprehensive modernization of Android build system components - upgraded Gradle (8.3.0→8.7.0), Android Gradle Plugin (8.2.1→8.6.0), Kotlin (1.9.20→2.1.0), and Java target compatibility (8→11), eliminating all 6 build warnings for cleaner development experience
 - **Widget Refresh System Fix (Latest - v4.0.3+32)**: Fixed critical widget auto-refresh issues on both platforms - Android key mismatch resolved (`flutter.widget_auto_refresh` → `widget_auto_refresh`) and iOS background-app-refresh permission added to Info.plist
 - **Widget Key Consistency Fix (v4.0.3+27)**: Fixed iOS widget auto-refresh setting key mismatch issue (`flutter.widget_auto_refresh` → `widget_auto_refresh`), added automatic Android WorkManager scheduling, improved multi-vehicle parsing with order-independent vehicle-location mapping for consistent vehicle sequence
 - **Widget Background Refresh System (v4.0.3+26)**: Comprehensive widget background refresh implementation with iOS Background App Refresh support, Android WorkManager integration, 15-minute update intervals, and user-controlled settings interface
@@ -877,10 +878,10 @@ All test mode code is protected with `⚠️ cleanup 금지` comments to prevent
 ### ⚠️ CRITICAL: Automatic Version Increment
 **MANDATORY**: Every Git commit must automatically increment the build number in pubspec.yaml
 
-**Current Version**: 4.0.3+35 (as of latest update)
+**Current Version**: 4.0.3+37 (as of latest update)
 
 **Version Increment Rules**:
-1. **Before every Git commit**: Automatically increment build number (e.g., 4.0.3+35 → 4.0.3+36)
+1. **Before every Git commit**: Automatically increment build number (e.g., 4.0.3+37 → 4.0.3+38)
 2. **Version format**: MAJOR.MINOR.PATCH+BUILD (keep MAJOR.MINOR.PATCH unchanged, only increment BUILD)
 3. **Read current version** from pubspec.yaml line ~19: `version: X.Y.Z+BUILD`
 4. **Auto-increment**: BUILD number by +1
