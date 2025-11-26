@@ -97,9 +97,9 @@ class WidgetUpdateWorker(
                 return Result.failure()
             }
             
-            // 위젯 자동 새로고침 설정 확인
+            // 위젯 자동 새로고침 설정 확인 (flutter. 접두사 사용)
             val widgetData = HomeWidgetPlugin.getData(applicationContext)
-            val autoRefreshEnabled = widgetData.getBoolean("widget_auto_refresh", true)
+            val autoRefreshEnabled = widgetData.getBoolean("flutter.widget_auto_refresh", true)
             
             if (!autoRefreshEnabled) {
                 android.util.Log.d("WidgetUpdateWorker", "위젯 자동 새로고침이 비활성화됨")
@@ -161,9 +161,9 @@ class WidgetUpdateWorker(
                 
                 android.util.Log.d("WidgetUpdateWorker", "서버 응답 수신, HTML 길이: ${response.length}")
                 
-                // 선택된 차량 인덱스 확인
+                // 선택된 차량 인덱스 확인 (flutter. 접두사 사용)
                 val updatedData = HomeWidgetPlugin.getData(applicationContext)
-                val selectedVehicleIndex = updatedData.getInt("selected_vehicle_index", 1)
+                val selectedVehicleIndex = updatedData.getInt("flutter.selected_vehicle_index", 1)
                 
                 // HTML에서 다중차량 층 정보 추출
                 val vehicleFloors = extractMultipleFloorsFromHTML(response)
@@ -182,14 +182,14 @@ class WidgetUpdateWorker(
                 
                 android.util.Log.d("WidgetUpdateWorker", "추출된 정보: $floorInfo ($colorKey)")
                 
-                // SharedPreferences에 저장
+                // SharedPreferences에 저장 (flutter. 접두사 사용하여 Flutter와 일관성 유지)
                 val widgetData = HomeWidgetPlugin.getData(applicationContext)
                 val editor = widgetData.edit()
-                editor.putString("floor_info", floorInfo)
-                editor.putString("floor_color", colorKey)
-                editor.putString("status_text", statusText)
+                editor.putString("flutter.floor_info", floorInfo)
+                editor.putString("flutter.floor_color", colorKey)
+                editor.putString("flutter.status_text", statusText)
                 // 마지막 업데이트 시간 저장
-                editor.putLong("last_update_timestamp", System.currentTimeMillis())
+                editor.putLong("flutter.last_update_timestamp", System.currentTimeMillis())
                 editor.apply()
                 
                 connection.disconnect()

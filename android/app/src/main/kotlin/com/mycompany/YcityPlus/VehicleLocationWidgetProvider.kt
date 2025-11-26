@@ -43,7 +43,7 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
             val dong = widgetData.getString("flutter.user_dong", "") ?: ""
             val ho = widgetData.getString("flutter.user_ho", "") ?: ""
             val serialNumber = widgetData.getString("flutter.user_serial_number", "") ?: ""
-            val autoRefreshEnabled = widgetData.getBoolean("widget_auto_refresh", true)
+            val autoRefreshEnabled = widgetData.getBoolean("flutter.widget_auto_refresh", true)
             
             android.util.Log.d("VehicleLocationWidget", "자동 새로고침 설정: $autoRefreshEnabled")
             android.util.Log.d("VehicleLocationWidget", "사용자 정보: ${dong}동 ${ho}호 $serialNumber")
@@ -53,10 +53,10 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
                 fetchLatestVehicleLocation(context, dong, ho, serialNumber) { success ->
                     android.util.Log.d("VehicleLocationWidget", "서버 새로고침 결과: ${if (success) "성공" else "실패"}")
                     
-                    // 최신 데이터로 위젯 업데이트
+                    // 최신 데이터로 위젯 업데이트 (flutter. 접두사 우선, 없으면 일반 키로 폴백)
                     val updatedData = HomeWidgetPlugin.getData(context)
-                    val floorInfo = updatedData.getString("floor_info", "위치 정보 없음") ?: "위치 정보 없음"
-                    val colorKey = updatedData.getString("floor_color", "grey") ?: "grey"
+                    val floorInfo = updatedData.getString("flutter.floor_info", null) ?: updatedData.getString("floor_info", "위치 정보 없음") ?: "위치 정보 없음"
+                    val colorKey = updatedData.getString("flutter.floor_color", null) ?: updatedData.getString("floor_color", "grey") ?: "grey"
                     
                     android.util.Log.d("VehicleLocationWidget", "최종 데이터:")
                     android.util.Log.d("VehicleLocationWidget", "  - floor_info: $floorInfo")
@@ -65,9 +65,9 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
                     displayWidgetContent(context, appWidgetManager, appWidgetId, floorInfo, colorKey)
                 }
             } else {
-                // 캐시된 데이터만 사용 (기존 방식)
-                val floorInfo = widgetData.getString("floor_info", "위치 정보 없음") ?: "위치 정보 없음"
-                val colorKey = widgetData.getString("floor_color", "grey") ?: "grey"
+                // 캐시된 데이터만 사용 (flutter. 접두사 우선, 없으면 일반 키로 폴백)
+                val floorInfo = widgetData.getString("flutter.floor_info", null) ?: widgetData.getString("floor_info", "위치 정보 없음") ?: "위치 정보 없음"
+                val colorKey = widgetData.getString("flutter.floor_color", null) ?: widgetData.getString("floor_color", "grey") ?: "grey"
                 
                 android.util.Log.d("VehicleLocationWidget", "캐시된 데이터 사용:")
                 android.util.Log.d("VehicleLocationWidget", "  - floor_info: $floorInfo")
@@ -118,9 +118,9 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
                     
                     android.util.Log.d("VehicleLocationWidget", "서버 응답 수신, HTML 길이: ${response.length}")
                     
-                    // 선택된 차량 인덱스 확인
+                    // 선택된 차량 인덱스 확인 (flutter. 접두사 사용)
                     val updatedData = HomeWidgetPlugin.getData(context)
-                    val selectedVehicleIndex = updatedData.getInt("selected_vehicle_index", 1)
+                    val selectedVehicleIndex = updatedData.getInt("flutter.selected_vehicle_index", 1)
                     
                     // HTML에서 다중차량 층 정보 추출
                     val vehicleFloors = extractMultipleFloorsFromHTML(response)
@@ -139,14 +139,14 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
                     
                     android.util.Log.d("VehicleLocationWidget", "추출된 정보: $floorInfo ($colorKey)")
                     
-                    // SharedPreferences에 저장
+                    // SharedPreferences에 저장 (flutter. 접두사 사용하여 Flutter와 일관성 유지)
                     val widgetData = HomeWidgetPlugin.getData(context)
                     val editor = widgetData.edit()
-                    editor.putString("floor_info", floorInfo)
-                    editor.putString("floor_color", colorKey)
-                    editor.putString("status_text", statusText)
+                    editor.putString("flutter.floor_info", floorInfo)
+                    editor.putString("flutter.floor_color", colorKey)
+                    editor.putString("flutter.status_text", statusText)
                     // 마지막 업데이트 시간 저장
-                    editor.putLong("last_update_timestamp", System.currentTimeMillis())
+                    editor.putLong("flutter.last_update_timestamp", System.currentTimeMillis())
                     editor.apply()
                     
                     callback(true)
@@ -374,7 +374,11 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
      */
     private fun getLastUpdateTime(context: Context): String {
         val widgetData = HomeWidgetPlugin.getData(context)
-        val lastUpdateTimestamp = widgetData.getLong("last_update_timestamp", 0L)
+        // flutter. 접두사 우선, 없으면 일반 키로 폴백
+        var lastUpdateTimestamp = widgetData.getLong("flutter.last_update_timestamp", 0L)
+        if (lastUpdateTimestamp == 0L) {
+            lastUpdateTimestamp = widgetData.getLong("last_update_timestamp", 0L)
+        }
         
         // timestamp가 0이면 정보 없음
         if (lastUpdateTimestamp == 0L) {

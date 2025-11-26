@@ -38,8 +38,8 @@ struct Provider: TimelineProvider {
         let ho = userDefaults?.string(forKey: "flutter.user_ho") ?? ""
         let serialNumber = userDefaults?.string(forKey: "flutter.user_serial_number") ?? ""
         
-        // 위젯 자동 새로고침 설정 확인
-        let autoRefreshEnabled = userDefaults?.bool(forKey: "widget_auto_refresh") ?? true
+        // 위젯 자동 새로고침 설정 확인 (flutter. 접두사 사용)
+        let autoRefreshEnabled = userDefaults?.object(forKey: "flutter.widget_auto_refresh") as? Bool ?? true
         
         print("[VehicleLocationWidget] 자동 새로고침 설정: \(autoRefreshEnabled)")
         print("[VehicleLocationWidget] 사용자 정보: \(dong)동 \(ho)호 \(serialNumber)")
@@ -49,10 +49,10 @@ struct Provider: TimelineProvider {
             fetchLatestVehicleLocation(dong: dong, ho: ho, serialNumber: serialNumber, userDefaults: userDefaults) { success in
                 print("[VehicleLocationWidget] 서버 새로고침 결과: \(success ? "성공" : "실패")")
                 
-                // 최신 데이터로 위젯 업데이트
-                let floorInfo = userDefaults?.string(forKey: "floor_info") ?? "위치 정보 없음"
-                let colorKey = userDefaults?.string(forKey: "floor_color") ?? "grey"
-                let statusText = userDefaults?.string(forKey: "status_text") ?? "차량 정보 없음"
+                // 최신 데이터로 위젯 업데이트 (flutter. 접두사 우선, 없으면 일반 키로 폴백)
+                let floorInfo = userDefaults?.string(forKey: "flutter.floor_info") ?? userDefaults?.string(forKey: "floor_info") ?? "위치 정보 없음"
+                let colorKey = userDefaults?.string(forKey: "flutter.floor_color") ?? userDefaults?.string(forKey: "floor_color") ?? "grey"
+                let statusText = userDefaults?.string(forKey: "flutter.status_text") ?? userDefaults?.string(forKey: "status_text") ?? "차량 정보 없음"
                 
                 print("[VehicleLocationWidget] 최종 데이터:")
                 print("[VehicleLocationWidget]   - floor_info: \(floorInfo)")
@@ -72,10 +72,10 @@ struct Provider: TimelineProvider {
                 completion(timeline)
             }
         } else {
-            // 캐시된 데이터만 사용 (기존 방식)
-            let floorInfo = userDefaults?.string(forKey: "floor_info") ?? "위치 정보 없음"
-            let colorKey = userDefaults?.string(forKey: "floor_color") ?? "grey"
-            let statusText = userDefaults?.string(forKey: "status_text") ?? "차량 정보 없음"
+            // 캐시된 데이터만 사용 (flutter. 접두사 우선, 없으면 일반 키로 폴백)
+            let floorInfo = userDefaults?.string(forKey: "flutter.floor_info") ?? userDefaults?.string(forKey: "floor_info") ?? "위치 정보 없음"
+            let colorKey = userDefaults?.string(forKey: "flutter.floor_color") ?? userDefaults?.string(forKey: "floor_color") ?? "grey"
+            let statusText = userDefaults?.string(forKey: "flutter.status_text") ?? userDefaults?.string(forKey: "status_text") ?? "차량 정보 없음"
             
             print("[VehicleLocationWidget] 캐시된 데이터 사용:")
             print("[VehicleLocationWidget]   - floor_info: \(floorInfo)")
@@ -140,12 +140,12 @@ func fetchLatestVehicleLocation(dong: String, ho: String, serialNumber: String, 
         
         print("[VehicleLocationWidget] 추출된 정보: \(floorInfo) (\(colorKey))")
         
-        // UserDefaults에 저장
-        userDefaults?.set(floorInfo, forKey: "floor_info")
-        userDefaults?.set(colorKey, forKey: "floor_color")
-        userDefaults?.set(statusText, forKey: "status_text")
+        // UserDefaults에 저장 (flutter. 접두사 사용하여 Flutter와 일관성 유지)
+        userDefaults?.set(floorInfo, forKey: "flutter.floor_info")
+        userDefaults?.set(colorKey, forKey: "flutter.floor_color")
+        userDefaults?.set(statusText, forKey: "flutter.status_text")
         // 마지막 업데이트 시간 저장 (milliseconds)
-        userDefaults?.set(Date().timeIntervalSince1970 * 1000, forKey: "last_update_timestamp")
+        userDefaults?.set(Date().timeIntervalSince1970 * 1000, forKey: "flutter.last_update_timestamp")
         userDefaults?.synchronize()
         
         completion(true)
@@ -298,9 +298,9 @@ struct VehicleLocationWidgetEntryView: View {
     
     /// 마지막 업데이트 시간을 "몇 분 전" 형태로 변환
     private func getTimeAgoText(_ date: Date) -> String {
-        // UserDefaults에서 실제 마지막 업데이트 시간 읽기
+        // UserDefaults에서 실제 마지막 업데이트 시간 읽기 (flutter. 접두사 우선)
         let userDefaults = UserDefaults(suiteName: "group.com.ilsan-ycity.ilsanycityplus")
-        let lastUpdateTimestamp = userDefaults?.double(forKey: "last_update_timestamp") ?? 0
+        let lastUpdateTimestamp = userDefaults?.double(forKey: "flutter.last_update_timestamp") ?? userDefaults?.double(forKey: "last_update_timestamp") ?? 0
         
         // timestamp가 0이면 정보 없음
         if lastUpdateTimestamp == 0 {
