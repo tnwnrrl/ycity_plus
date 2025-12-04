@@ -660,7 +660,7 @@ Update in `pubspec.yaml`:
 version: 4.0.3+32  # Format: MAJOR.MINOR.PATCH+BUILD
 ```
 
-**Current Version**: 4.0.3+39 (as of latest update)
+**Current Version**: 4.0.3+40 (as of latest update)
 
 ### ⚠️ iOS Code Signing - CRITICAL RULES
 
@@ -855,8 +855,9 @@ All test mode code is protected with `⚠️ cleanup 금지` comments to prevent
 
 ## Important Project Notes
 
-### Recent Critical Updates (v4.0.3+39)
-- **Widget SharedPreferences Key Consistency Fix (Latest - v4.0.3+39)**: Fixed critical SharedPreferences key mismatch between Flutter and native widget code. Flutter's home_widget package automatically adds `flutter.` prefix when saving data, but iOS/Android widgets were reading without the prefix. Updated all native widget code to use `flutter.` prefix consistently for: `floor_info`, `floor_color`, `status_text`, `last_update_timestamp`, `widget_auto_refresh`, `selected_vehicle_index`. This fix enables proper background refresh data synchronization between Flutter app and native widgets.
+### Recent Critical Updates (v4.0.3+40)
+- **Widget SharedPreferences Key Prefix Fix (Latest - v4.0.3+40)**: Corrected critical misunderstanding about home_widget package behavior. The home_widget package does NOT automatically add `flutter.` prefix to keys. Updated Flutter's home_widget_service.dart to explicitly use `flutter.` prefixed keys (e.g., `flutter.user_dong`, `flutter.floor_info`) to match iOS widget's key naming. Previously, Flutter saved to `user_dong` but iOS widget read from `flutter.user_dong`, causing data synchronization failure. All keys are now consistent across both platforms.
+- **Widget SharedPreferences Key Consistency Fix (v4.0.3+39)**: Fixed critical SharedPreferences key mismatch between Flutter and native widget code. Updated native widget code to use `flutter.` prefix consistently for: `floor_info`, `floor_color`, `status_text`, `last_update_timestamp`, `widget_auto_refresh`, `selected_vehicle_index`.
 - **iOS Widget ATS Fix (v4.0.3+37)**: Resolved iOS widget background refresh issue by adding NSAppTransportSecurity exception to VehicleLocationWidget/Info.plist, enabling HTTP communication to parking system server (122.199.183.213) for proper background updates when app is closed
 - **Android Build System Upgrade (v4.0.3+35)**: Comprehensive modernization of Android build system components - upgraded Gradle (8.3.0→8.7.0), Android Gradle Plugin (8.2.1→8.6.0), Kotlin (1.9.20→2.1.0), and Java target compatibility (8→11), eliminating all 6 build warnings for cleaner development experience
 - **Widget Refresh System Fix (Latest - v4.0.3+32)**: Fixed critical widget auto-refresh issues on both platforms - Android key mismatch resolved (`flutter.widget_auto_refresh` → `widget_auto_refresh`) and iOS background-app-refresh permission added to Info.plist
@@ -879,7 +880,7 @@ All test mode code is protected with `⚠️ cleanup 금지` comments to prevent
 ### ⚠️ CRITICAL: Automatic Version Increment
 **MANDATORY**: Every Git commit must automatically increment the build number in pubspec.yaml
 
-**Current Version**: 4.0.3+39 (as of latest update)
+**Current Version**: 4.0.3+40 (as of latest update)
 
 **Version Increment Rules**:
 1. **Before every Git commit**: Automatically increment build number (e.g., 4.0.3+37 → 4.0.3+38)

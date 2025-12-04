@@ -7,13 +7,25 @@ import '../models/parking_floor_info.dart';
 
 class HomeWidgetService {
   static const String _appGroupId = 'group.com.ilsan-ycity.ilsanycityplus';
-  static const String _floorInfoKey = 'floor_info';
-  static const String _colorKey = 'floor_color';
-  static const String _statusKey = 'status_text';
-  
+
+  // ⚠️ 중요: iOS 위젯과 키 이름 일치를 위해 flutter. 접두사 사용
+  // home_widget 패키지는 접두사를 자동으로 추가하지 않으므로 명시적으로 추가해야 함
+  static const String _floorInfoKey = 'flutter.floor_info';
+  static const String _colorKey = 'flutter.floor_color';
+  static const String _statusKey = 'flutter.status_text';
+  static const String _lastUpdateTimestampKey = 'flutter.last_update_timestamp';
+
   // 다중 차량 지원을 위한 새로운 키들
-  static const String _selectedVehicleIndexKey = 'selected_vehicle_index';
-  static const String _vehicleCountKey = 'vehicle_count';
+  static const String _selectedVehicleIndexKey = 'flutter.selected_vehicle_index';
+  static const String _vehicleCountKey = 'flutter.vehicle_count';
+
+  // 사용자 정보 키 (iOS 위젯 백그라운드 새로고침용)
+  static const String _userDongKey = 'flutter.user_dong';
+  static const String _userHoKey = 'flutter.user_ho';
+  static const String _userSerialNumberKey = 'flutter.user_serial_number';
+
+  // 위젯 자동 새로고침 설정 키
+  static const String _widgetAutoRefreshKey = 'flutter.widget_auto_refresh';
 
   // Android MethodChannel for widget click events
   static const MethodChannel _widgetClickChannel =
@@ -27,7 +39,9 @@ class HomeWidgetService {
   static Future<void> initialize() async {
     try {
       // iOS App Group 설정
+      _log('🔧 App Group 설정 시작: $_appGroupId');
       await HomeWidget.setAppGroupId(_appGroupId);
+      _log('✅ App Group 설정 완료: $_appGroupId');
 
       // 플랫폼별 위젯 클릭 이벤트 처리
       if (Platform.isAndroid) {
@@ -115,19 +129,24 @@ class HomeWidgetService {
   }
 
   // 사용자 정보를 위젯이 접근할 수 있도록 저장 (백그라운드 새로고침용 포함)
+  // ⚠️ 중요: home_widget 패키지는 flutter. 접두사를 자동으로 추가하지 않음!
+  // iOS 위젯에서 flutter.user_dong 등으로 접근하므로 명시적으로 flutter. 접두사 포함 키 사용
   static Future<void> saveUserInfo(String dong, String ho, String serialNumber) async {
     try {
+      _log('📝 사용자 정보 저장 시작: $dong동 $ho호');
+
+      // App Group이 설정되어 있는지 다시 확인
+      await HomeWidget.setAppGroupId(_appGroupId);
+
+      // ⚠️ 키에 flutter. 접두사 사용 (iOS 위젯과 일치)
       await Future.wait([
-        HomeWidget.saveWidgetData<String>('user_dong', dong),
-        HomeWidget.saveWidgetData<String>('user_ho', ho),
-        HomeWidget.saveWidgetData<String>('user_serial', serialNumber),
-        // 백그라운드 새로고침용 키 추가
-        HomeWidget.saveWidgetData<String>('user_serial_number', serialNumber),
+        HomeWidget.saveWidgetData<String>(_userDongKey, dong),
+        HomeWidget.saveWidgetData<String>(_userHoKey, ho),
+        HomeWidget.saveWidgetData<String>(_userSerialNumberKey, serialNumber),
       ]);
-      
-      if (kDebugMode) {
-        debugPrint('[HomeWidgetService] 사용자 정보 저장 완료: $dong동 $ho호 $serialNumber');
-      }
+
+      _log('✅ 사용자 정보 저장 완료: $dong동 $ho호');
+      _log('   저장된 키: $_userDongKey, $_userHoKey, $_userSerialNumberKey');
 
       // Android WorkManager 자동 시작 (자동 새로고침이 활성화된 경우)
       if (Platform.isAndroid) {
@@ -146,19 +165,19 @@ class HomeWidgetService {
   // 위젯 자동 새로고침 설정 저장
   static Future<void> saveWidgetAutoRefreshSetting(bool enabled) async {
     try {
-      await HomeWidget.saveWidgetData<bool>('widget_auto_refresh', enabled);
-      
+      await HomeWidget.saveWidgetData<bool>(_widgetAutoRefreshKey, enabled);
+
       if (kDebugMode) {
-        debugPrint('[HomeWidgetService] 위젯 자동 새로고침 설정 저장: $enabled');
+        debugPrint('[HomeWidgetService] 위젯 자동 새로고침 설정 저장: $enabled (키: $_widgetAutoRefreshKey)');
       }
 
       // Android WorkManager 스케줄링 관리
       if (Platform.isAndroid) {
         if (enabled) {
           // 자동 새로고침 활성화 시 WorkManager 스케줄링 시작
-          final dong = await HomeWidget.getWidgetData<String>('user_dong', defaultValue: '');
-          final ho = await HomeWidget.getWidgetData<String>('user_ho', defaultValue: '');
-          final serialNumber = await HomeWidget.getWidgetData<String>('user_serial', defaultValue: '');
+          final dong = await HomeWidget.getWidgetData<String>(_userDongKey, defaultValue: '');
+          final ho = await HomeWidget.getWidgetData<String>(_userHoKey, defaultValue: '');
+          final serialNumber = await HomeWidget.getWidgetData<String>(_userSerialNumberKey, defaultValue: '');
           
           if (dong?.isNotEmpty == true && ho?.isNotEmpty == true && serialNumber?.isNotEmpty == true) {
             await startPeriodicBackgroundUpdates(dong!, ho!, serialNumber!);
@@ -181,9 +200,8 @@ class HomeWidgetService {
       _log('🔄 앱 포그라운드 진입 - 위젯 강제 업데이트 시작');
       
       // 캐시된 위젯 데이터 읽기
-      final floorInfo = await HomeWidget.getWidgetData<String>('floor_info', defaultValue: '');
-      final colorKey = await HomeWidget.getWidgetData<String>('floor_color', defaultValue: 'grey');
-      final statusText = await HomeWidget.getWidgetData<String>('status_text', defaultValue: '차량 정보 없음');
+      final floorInfo = await HomeWidget.getWidgetData<String>(_floorInfoKey, defaultValue: '');
+      final colorKey = await HomeWidget.getWidgetData<String>(_colorKey, defaultValue: 'grey');
       
       if (floorInfo?.isNotEmpty == true) {
         // 강제 위젯 업데이트 트리거
@@ -209,9 +227,9 @@ class HomeWidgetService {
       _log('👆 위젯 탭 감지 - 즉시 새로고침 시작');
       
       // 사용자 정보 확인
-      final dong = await HomeWidget.getWidgetData<String>('user_dong', defaultValue: '');
-      final ho = await HomeWidget.getWidgetData<String>('user_ho', defaultValue: '');
-      final serialNumber = await HomeWidget.getWidgetData<String>('user_serial', defaultValue: '');
+      final dong = await HomeWidget.getWidgetData<String>(_userDongKey, defaultValue: '');
+      final ho = await HomeWidget.getWidgetData<String>(_userHoKey, defaultValue: '');
+      final serialNumber = await HomeWidget.getWidgetData<String>(_userSerialNumberKey, defaultValue: '');
       
       if (dong?.isNotEmpty == true && ho?.isNotEmpty == true && serialNumber?.isNotEmpty == true) {
         // Android에서 즉시 WorkManager 업데이트 작업 예약
@@ -232,7 +250,7 @@ class HomeWidgetService {
   // 위젯 자동 새로고침 설정 불러오기
   static Future<bool> getWidgetAutoRefreshSetting() async {
     try {
-      final enabled = await HomeWidget.getWidgetData<bool>('widget_auto_refresh', defaultValue: true);
+      final enabled = await HomeWidget.getWidgetData<bool>(_widgetAutoRefreshKey, defaultValue: true);
       return enabled ?? true;
     } catch (e) {
       if (kDebugMode) {
@@ -287,11 +305,11 @@ class HomeWidgetService {
         final index = i + 1; // 1-based 인덱스
         
         await Future.wait([
-          HomeWidget.saveWidgetData<String>('vehicle_${index}_floor', vehicle.floor),
-          HomeWidget.saveWidgetData<String>('vehicle_${index}_color', vehicle.floorColorKey),
-          HomeWidget.saveWidgetData<String>('vehicle_${index}_status', vehicle.statusText),
-          HomeWidget.saveWidgetData<String>('vehicle_${index}_display_name', vehicle.displayName),
-          HomeWidget.saveWidgetData<int>('vehicle_${index}_vehicle_index', vehicle.vehicleIndex),
+          HomeWidget.saveWidgetData<String>('flutter.vehicle_${index}_floor', vehicle.floor),
+          HomeWidget.saveWidgetData<String>('flutter.vehicle_${index}_color', vehicle.floorColorKey),
+          HomeWidget.saveWidgetData<String>('flutter.vehicle_${index}_status', vehicle.statusText),
+          HomeWidget.saveWidgetData<String>('flutter.vehicle_${index}_display_name', vehicle.displayName),
+          HomeWidget.saveWidgetData<int>('flutter.vehicle_${index}_vehicle_index', vehicle.vehicleIndex),
         ]);
       }
       
@@ -344,8 +362,8 @@ class HomeWidgetService {
         HomeWidget.saveWidgetData<String>(_floorInfoKey, floorText),
         HomeWidget.saveWidgetData<String>(_colorKey, colorKey),
         HomeWidget.saveWidgetData<String>(_statusKey, statusText),
-        // 마지막 업데이트 시간 저장
-        HomeWidget.saveWidgetData<int>('last_update_timestamp', DateTime.now().millisecondsSinceEpoch),
+        // 마지막 업데이트 시간 저장 (flutter. 접두사 사용)
+        HomeWidget.saveWidgetData<int>(_lastUpdateTimestampKey, DateTime.now().millisecondsSinceEpoch),
       ]);
       
       _log('  ✅ floor_info 저장됨: $floorText');
@@ -541,6 +559,100 @@ class HomeWidgetService {
       } catch (e) {
         _log('Android WorkManager 주기적 업데이트 중지 실패: $e');
       }
+    }
+  }
+
+  // 🔍 디버그: 위젯 새로고침 상태 확인 (iOS 전용)
+  static Future<Map<String, dynamic>> getWidgetDebugInfo() async {
+    try {
+      final debugInfo = <String, dynamic>{};
+
+      // 사용자 정보 확인
+      debugInfo['user_dong'] = await HomeWidget.getWidgetData<String>(_userDongKey, defaultValue: '');
+      debugInfo['user_ho'] = await HomeWidget.getWidgetData<String>(_userHoKey, defaultValue: '');
+      debugInfo['user_serial_number'] = await HomeWidget.getWidgetData<String>(_userSerialNumberKey, defaultValue: '');
+
+      // 위젯 데이터 확인
+      debugInfo['floor_info'] = await HomeWidget.getWidgetData<String>(_floorInfoKey, defaultValue: '');
+      debugInfo['floor_color'] = await HomeWidget.getWidgetData<String>(_colorKey, defaultValue: '');
+      debugInfo['status_text'] = await HomeWidget.getWidgetData<String>(_statusKey, defaultValue: '');
+
+      // 설정 확인
+      debugInfo['widget_auto_refresh'] = await HomeWidget.getWidgetData<bool>(_widgetAutoRefreshKey, defaultValue: true);
+
+      // 마지막 업데이트 시간
+      final lastUpdateTimestamp = await HomeWidget.getWidgetData<int>(_lastUpdateTimestampKey, defaultValue: 0);
+      if (lastUpdateTimestamp != null && lastUpdateTimestamp != 0) {
+        final lastUpdate = DateTime.fromMillisecondsSinceEpoch(lastUpdateTimestamp);
+        debugInfo['last_update_time'] = lastUpdate.toString();
+        debugInfo['last_update_ago'] = _getTimeAgo(lastUpdate);
+      } else {
+        debugInfo['last_update_time'] = 'N/A';
+        debugInfo['last_update_ago'] = 'N/A';
+      }
+
+      // iOS 위젯 전용 디버그 정보
+      // iOS 위젯이 flutter.widget_refresh_count 키로 저장하므로
+      // Flutter에서도 동일한 키(flutter. 접두사 포함)로 읽어야 함
+      if (Platform.isIOS) {
+        debugInfo['widget_refresh_count'] = await HomeWidget.getWidgetData<int>('flutter.widget_refresh_count', defaultValue: 0);
+
+        final lastRefreshTime = await HomeWidget.getWidgetData<double>('flutter.widget_last_refresh_time', defaultValue: 0.0);
+        if (lastRefreshTime != null && lastRefreshTime != 0.0) {
+          final refreshDate = DateTime.fromMillisecondsSinceEpoch((lastRefreshTime * 1000).toInt());
+          debugInfo['widget_last_refresh_time'] = refreshDate.toString();
+          debugInfo['widget_last_refresh_ago'] = _getTimeAgo(refreshDate);
+        } else {
+          debugInfo['widget_last_refresh_time'] = 'N/A';
+          debugInfo['widget_last_refresh_ago'] = 'N/A';
+        }
+
+        debugInfo['widget_last_fetch_success'] = await HomeWidget.getWidgetData<bool>('flutter.widget_last_fetch_success', defaultValue: false);
+      }
+
+      _log('🔍 위젯 디버그 정보: $debugInfo');
+      return debugInfo;
+    } catch (e) {
+      _log('위젯 디버그 정보 조회 실패: $e');
+      return {'error': e.toString()};
+    }
+  }
+
+  // 시간 경과 문자열 생성
+  static String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inSeconds < 60) {
+      return '${difference.inSeconds}초 전';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}분 전';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}시간 전';
+    } else {
+      return '${difference.inDays}일 전';
+    }
+  }
+
+  // 🔄 iOS 위젯 강제 새로고침 테스트
+  static Future<void> forceRefreshIOSWidget() async {
+    if (!Platform.isIOS) {
+      _log('iOS 전용 기능입니다');
+      return;
+    }
+
+    try {
+      _log('🔄 iOS 위젯 강제 새로고침 시작...');
+
+      // WidgetKit reloadAllTimelines 호출
+      await HomeWidget.updateWidget(
+        name: 'VehicleLocationWidget',
+        iOSName: 'VehicleLocationWidget',
+      );
+
+      _log('✅ iOS 위젯 새로고침 요청 완료');
+    } catch (e) {
+      _log('❌ iOS 위젯 강제 새로고침 실패: $e');
     }
   }
 }
