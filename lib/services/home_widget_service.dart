@@ -564,26 +564,91 @@ class HomeWidgetService {
 
   // 🔍 디버그: 위젯 새로고침 상태 확인 (iOS 전용)
   static Future<Map<String, dynamic>> getWidgetDebugInfo() async {
+    final debugInfo = <String, dynamic>{};
+
     try {
-      // ⚠️ 중요: 데이터 읽기 전에 App Group 설정 필수
-      await HomeWidget.setAppGroupId(_appGroupId);
+      // ⚠️ 중요: 데이터 읽기 전에 App Group 설정 필수 (결과 확인)
+      _log('🔧 디버그: App Group 설정 시작...');
+      final setGroupResult = await HomeWidget.setAppGroupId(_appGroupId);
+      _log('🔧 디버그: App Group 설정 결과: $setGroupResult');
 
-      final debugInfo = <String, dynamic>{};
+      if (setGroupResult != true) {
+        _log('❌ App Group 설정 실패!');
+        debugInfo['_app_group_status'] = '설정 실패';
+        return debugInfo;
+      }
+      debugInfo['_app_group_status'] = '설정 성공';
+    } catch (e) {
+      _log('❌ App Group 설정 중 예외: $e');
+      debugInfo['_app_group_status'] = '예외: $e';
+      return debugInfo;
+    }
 
-      // 사용자 정보 확인
+    // 개별 try-catch로 각 데이터 읽기 (하나가 실패해도 다른 것은 읽을 수 있도록)
+
+    // 사용자 정보 확인
+    try {
       debugInfo['user_dong'] = await HomeWidget.getWidgetData<String>(_userDongKey, defaultValue: '');
+      _log('  user_dong: ${debugInfo['user_dong']}');
+    } catch (e) {
+      _log('❌ user_dong 읽기 실패: $e');
+      debugInfo['user_dong'] = null;
+      debugInfo['user_dong_error'] = e.toString();
+    }
+
+    try {
       debugInfo['user_ho'] = await HomeWidget.getWidgetData<String>(_userHoKey, defaultValue: '');
+      _log('  user_ho: ${debugInfo['user_ho']}');
+    } catch (e) {
+      _log('❌ user_ho 읽기 실패: $e');
+      debugInfo['user_ho'] = null;
+      debugInfo['user_ho_error'] = e.toString();
+    }
+
+    try {
       debugInfo['user_serial_number'] = await HomeWidget.getWidgetData<String>(_userSerialNumberKey, defaultValue: '');
+      _log('  user_serial_number: ${debugInfo['user_serial_number']?.isNotEmpty == true ? '***' : '(empty)'}');
+    } catch (e) {
+      _log('❌ user_serial_number 읽기 실패: $e');
+      debugInfo['user_serial_number'] = null;
+      debugInfo['user_serial_number_error'] = e.toString();
+    }
 
-      // 위젯 데이터 확인
+    // 위젯 데이터 확인
+    try {
       debugInfo['floor_info'] = await HomeWidget.getWidgetData<String>(_floorInfoKey, defaultValue: '');
+      _log('  floor_info: ${debugInfo['floor_info']}');
+    } catch (e) {
+      _log('❌ floor_info 읽기 실패: $e');
+      debugInfo['floor_info'] = null;
+    }
+
+    try {
       debugInfo['floor_color'] = await HomeWidget.getWidgetData<String>(_colorKey, defaultValue: '');
+      _log('  floor_color: ${debugInfo['floor_color']}');
+    } catch (e) {
+      _log('❌ floor_color 읽기 실패: $e');
+      debugInfo['floor_color'] = null;
+    }
+
+    try {
       debugInfo['status_text'] = await HomeWidget.getWidgetData<String>(_statusKey, defaultValue: '');
+      _log('  status_text: ${debugInfo['status_text']}');
+    } catch (e) {
+      _log('❌ status_text 읽기 실패: $e');
+      debugInfo['status_text'] = null;
+    }
 
-      // 설정 확인
+    // 설정 확인
+    try {
       debugInfo['widget_auto_refresh'] = await HomeWidget.getWidgetData<bool>(_widgetAutoRefreshKey, defaultValue: true);
+    } catch (e) {
+      _log('❌ widget_auto_refresh 읽기 실패: $e');
+      debugInfo['widget_auto_refresh'] = null;
+    }
 
-      // 마지막 업데이트 시간
+    // 마지막 업데이트 시간
+    try {
       final lastUpdateTimestamp = await HomeWidget.getWidgetData<int>(_lastUpdateTimestampKey, defaultValue: 0);
       if (lastUpdateTimestamp != null && lastUpdateTimestamp != 0) {
         final lastUpdate = DateTime.fromMillisecondsSinceEpoch(lastUpdateTimestamp);
@@ -593,13 +658,24 @@ class HomeWidgetService {
         debugInfo['last_update_time'] = 'N/A';
         debugInfo['last_update_ago'] = 'N/A';
       }
+    } catch (e) {
+      _log('❌ last_update_timestamp 읽기 실패: $e');
+      debugInfo['last_update_time'] = 'Error';
+      debugInfo['last_update_ago'] = 'Error';
+    }
 
-      // iOS 위젯 전용 디버그 정보
-      // iOS 위젯이 flutter.widget_refresh_count 키로 저장하므로
-      // Flutter에서도 동일한 키(flutter. 접두사 포함)로 읽어야 함
-      if (Platform.isIOS) {
+    // iOS 위젯 전용 디버그 정보
+    // iOS 위젯이 flutter.widget_refresh_count 키로 저장하므로
+    // Flutter에서도 동일한 키(flutter. 접두사 포함)로 읽어야 함
+    if (Platform.isIOS) {
+      try {
         debugInfo['widget_refresh_count'] = await HomeWidget.getWidgetData<int>('flutter.widget_refresh_count', defaultValue: 0);
+      } catch (e) {
+        _log('❌ widget_refresh_count 읽기 실패: $e');
+        debugInfo['widget_refresh_count'] = null;
+      }
 
+      try {
         final lastRefreshTime = await HomeWidget.getWidgetData<double>('flutter.widget_last_refresh_time', defaultValue: 0.0);
         if (lastRefreshTime != null && lastRefreshTime != 0.0) {
           final refreshDate = DateTime.fromMillisecondsSinceEpoch((lastRefreshTime * 1000).toInt());
@@ -609,16 +685,22 @@ class HomeWidgetService {
           debugInfo['widget_last_refresh_time'] = 'N/A';
           debugInfo['widget_last_refresh_ago'] = 'N/A';
         }
-
-        debugInfo['widget_last_fetch_success'] = await HomeWidget.getWidgetData<bool>('flutter.widget_last_fetch_success', defaultValue: false);
+      } catch (e) {
+        _log('❌ widget_last_refresh_time 읽기 실패: $e');
+        debugInfo['widget_last_refresh_time'] = 'Error';
+        debugInfo['widget_last_refresh_ago'] = 'Error';
       }
 
-      _log('🔍 위젯 디버그 정보: $debugInfo');
-      return debugInfo;
-    } catch (e) {
-      _log('위젯 디버그 정보 조회 실패: $e');
-      return {'error': e.toString()};
+      try {
+        debugInfo['widget_last_fetch_success'] = await HomeWidget.getWidgetData<bool>('flutter.widget_last_fetch_success', defaultValue: false);
+      } catch (e) {
+        _log('❌ widget_last_fetch_success 읽기 실패: $e');
+        debugInfo['widget_last_fetch_success'] = null;
+      }
     }
+
+    _log('🔍 위젯 디버그 정보 수집 완료: $debugInfo');
+    return debugInfo;
   }
 
   // 시간 경과 문자열 생성

@@ -1790,16 +1790,23 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // App Group 상태 표시 (가장 먼저)
+              _buildDebugSection(isDark, '🔧 App Group 상태', [
+                'App Group: ${debugInfo['_app_group_status'] ?? 'N/A'}',
+                if (debugInfo['user_dong_error'] != null)
+                  '⚠️ user_dong 에러: ${debugInfo['user_dong_error']}',
+              ]),
+              const SizedBox(height: 16),
               _buildDebugSection(isDark, '사용자 정보', [
-                '동: ${debugInfo['user_dong'] ?? 'N/A'}',
-                '호: ${debugInfo['user_ho'] ?? 'N/A'}',
+                '동: ${debugInfo['user_dong']?.toString().isNotEmpty == true ? debugInfo['user_dong'] : 'N/A'}',
+                '호: ${debugInfo['user_ho']?.toString().isNotEmpty == true ? debugInfo['user_ho'] : 'N/A'}',
                 '시리얼: ${(debugInfo['user_serial_number'] as String?)?.isNotEmpty == true ? '***' : 'N/A'}',
               ]),
               const SizedBox(height: 16),
               _buildDebugSection(isDark, '위젯 데이터', [
-                '층 정보: ${debugInfo['floor_info'] ?? 'N/A'}',
-                '색상 키: ${debugInfo['floor_color'] ?? 'N/A'}',
-                '상태 텍스트: ${debugInfo['status_text'] ?? 'N/A'}',
+                '층 정보: ${debugInfo['floor_info']?.toString().isNotEmpty == true ? debugInfo['floor_info'] : 'N/A'}',
+                '색상 키: ${debugInfo['floor_color']?.toString().isNotEmpty == true ? debugInfo['floor_color'] : 'N/A'}',
+                '상태 텍스트: ${debugInfo['status_text']?.toString().isNotEmpty == true ? debugInfo['status_text'] : 'N/A'}',
               ]),
               const SizedBox(height: 16),
               _buildDebugSection(isDark, '마지막 업데이트', [
