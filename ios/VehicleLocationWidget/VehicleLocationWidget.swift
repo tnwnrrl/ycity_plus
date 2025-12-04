@@ -1,6 +1,10 @@
 import WidgetKit
 import SwiftUI
 import Foundation
+import os.log
+
+// 위젯 전용 로거 (콘솔에서 확인 가능)
+let widgetLogger = Logger(subsystem: "com.ilsan-ycity.ilsanycityplus.VehicleLocationWidget", category: "Widget")
 
 struct VehicleLocationWidget: Widget {
     let kind: String = "VehicleLocationWidget"
@@ -28,69 +32,117 @@ struct Provider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> ()) {
         let userDefaults = UserDefaults(suiteName: "group.com.ilsan-ycity.ilsanycityplus")
-        
+        let currentTime = Date()
+
+        // 새로고침 카운터 증가 및 저장 (flutter. 접두사 사용하여 Flutter에서 읽을 수 있도록)
+        let refreshCount = (userDefaults?.integer(forKey: "flutter.widget_refresh_count") ?? 0) + 1
+        userDefaults?.set(refreshCount, forKey: "flutter.widget_refresh_count")
+        userDefaults?.set(currentTime.timeIntervalSince1970, forKey: "flutter.widget_last_refresh_time")
+        userDefaults?.synchronize()
+
+        // OS 로거 사용 (Console.app에서 확인 가능)
+        widgetLogger.info("🔄 getTimeline 호출됨 (횟수: \(refreshCount))")
+        widgetLogger.info("📅 현재 시간: \(currentTime.description)")
+
         // 디버그 로깅 추가
-        print("[VehicleLocationWidget] getTimeline 호출됨")
+        print("[VehicleLocationWidget] ========================================")
+        print("[VehicleLocationWidget] getTimeline 호출됨 (횟수: \(refreshCount))")
+        print("[VehicleLocationWidget] 현재 시간: \(currentTime)")
         print("[VehicleLocationWidget] UserDefaults 생성됨: \(userDefaults != nil)")
-        
+
+        // 🔍 디버그: UserDefaults의 모든 키 출력
+        if let allKeys = userDefaults?.dictionaryRepresentation() {
+            print("[VehicleLocationWidget] 📋 UserDefaults 전체 키 목록 (\(allKeys.count)개):")
+            for (key, value) in allKeys.sorted(by: { $0.key < $1.key }) {
+                if key.contains("flutter") || key.contains("user") || key.contains("floor") || key.contains("widget") {
+                    print("[VehicleLocationWidget]   - \(key): \(value)")
+                }
+            }
+        }
+
         // 사용자 정보 조회 (백그라운드 새로고침용)
         let dong = userDefaults?.string(forKey: "flutter.user_dong") ?? ""
         let ho = userDefaults?.string(forKey: "flutter.user_ho") ?? ""
         let serialNumber = userDefaults?.string(forKey: "flutter.user_serial_number") ?? ""
-        
+
         // 위젯 자동 새로고침 설정 확인 (flutter. 접두사 사용)
         let autoRefreshEnabled = userDefaults?.object(forKey: "flutter.widget_auto_refresh") as? Bool ?? true
-        
+
+        widgetLogger.info("👤 사용자 정보: \(dong)동 \(ho)호 \(serialNumber.isEmpty ? "(시리얼 없음)" : "***")")
+        widgetLogger.info("⚙️ 자동 새로고침: \(autoRefreshEnabled ? "활성화" : "비활성화")")
+
         print("[VehicleLocationWidget] 자동 새로고침 설정: \(autoRefreshEnabled)")
         print("[VehicleLocationWidget] 사용자 정보: \(dong)동 \(ho)호 \(serialNumber)")
         
         // 백그라운드에서 서버 데이터 새로고침 시도
         if autoRefreshEnabled && !dong.isEmpty && !ho.isEmpty && !serialNumber.isEmpty {
+            widgetLogger.info("🌐 서버 요청 시작...")
+
             fetchLatestVehicleLocation(dong: dong, ho: ho, serialNumber: serialNumber, userDefaults: userDefaults) { success in
+                widgetLogger.info("📡 서버 응답: \(success ? "✅ 성공" : "❌ 실패")")
                 print("[VehicleLocationWidget] 서버 새로고침 결과: \(success ? "성공" : "실패")")
-                
+
+                // 서버 요청 성공 여부 저장 (flutter. 접두사 사용)
+                userDefaults?.set(success, forKey: "flutter.widget_last_fetch_success")
+                userDefaults?.synchronize()
+
                 // 최신 데이터로 위젯 업데이트 (flutter. 접두사 우선, 없으면 일반 키로 폴백)
                 let floorInfo = userDefaults?.string(forKey: "flutter.floor_info") ?? userDefaults?.string(forKey: "floor_info") ?? "위치 정보 없음"
                 let colorKey = userDefaults?.string(forKey: "flutter.floor_color") ?? userDefaults?.string(forKey: "floor_color") ?? "grey"
                 let statusText = userDefaults?.string(forKey: "flutter.status_text") ?? userDefaults?.string(forKey: "status_text") ?? "차량 정보 없음"
-                
+
+                widgetLogger.info("📊 최종 데이터: \(floorInfo) (\(colorKey))")
                 print("[VehicleLocationWidget] 최종 데이터:")
                 print("[VehicleLocationWidget]   - floor_info: \(floorInfo)")
                 print("[VehicleLocationWidget]   - floor_color: \(colorKey)")
                 print("[VehicleLocationWidget]   - status_text: \(statusText)")
-                
-                let entry = SimpleEntry(
+
+                var entry = SimpleEntry(
                     date: Date(),
                     floorInfo: floorInfo,
                     colorKey: colorKey,
                     statusText: statusText
                 )
-                
+                entry.refreshCount = refreshCount
+                entry.lastRefreshTime = currentTime
+                entry.serverFetchSuccess = success
+
                 // 5분마다 업데이트 (단축하여 더 자주 시도)
                 let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date()) ?? Date()
+                widgetLogger.info("⏰ 다음 업데이트 예정: \(nextUpdate.description)")
                 let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
                 completion(timeline)
             }
         } else {
+            if dong.isEmpty || ho.isEmpty || serialNumber.isEmpty {
+                widgetLogger.warning("⚠️ 사용자 정보 없음 - 캐시 데이터만 사용")
+                print("[VehicleLocationWidget] ⚠️ 사용자 정보가 비어있음! dong='\(dong)', ho='\(ho)', serial='\(serialNumber)'")
+            }
+
             // 캐시된 데이터만 사용 (flutter. 접두사 우선, 없으면 일반 키로 폴백)
             let floorInfo = userDefaults?.string(forKey: "flutter.floor_info") ?? userDefaults?.string(forKey: "floor_info") ?? "위치 정보 없음"
             let colorKey = userDefaults?.string(forKey: "flutter.floor_color") ?? userDefaults?.string(forKey: "floor_color") ?? "grey"
             let statusText = userDefaults?.string(forKey: "flutter.status_text") ?? userDefaults?.string(forKey: "status_text") ?? "차량 정보 없음"
-            
+
+            widgetLogger.info("📦 캐시 데이터 사용: \(floorInfo) (\(colorKey))")
             print("[VehicleLocationWidget] 캐시된 데이터 사용:")
             print("[VehicleLocationWidget]   - floor_info: \(floorInfo)")
             print("[VehicleLocationWidget]   - floor_color: \(colorKey)")
             print("[VehicleLocationWidget]   - status_text: \(statusText)")
-            
-            let entry = SimpleEntry(
+
+            var entry = SimpleEntry(
                 date: Date(),
                 floorInfo: floorInfo,
                 colorKey: colorKey,
                 statusText: statusText
             )
-            
+            entry.refreshCount = refreshCount
+            entry.lastRefreshTime = currentTime
+            entry.serverFetchSuccess = false
+
             // 5분마다 업데이트 (단축하여 더 자주 시도)
             let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date()) ?? Date()
+            widgetLogger.info("⏰ 다음 업데이트 예정: \(nextUpdate.description)")
             let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
             completion(timeline)
         }
@@ -205,6 +257,9 @@ struct SimpleEntry: TimelineEntry {
     let floorInfo: String
     let colorKey: String
     let statusText: String
+    var refreshCount: Int = 0  // 새로고침 카운터 (디버그용)
+    var lastRefreshTime: Date? = nil  // 마지막 새로고침 시간 (디버그용)
+    var serverFetchSuccess: Bool = false  // 서버 요청 성공 여부 (디버그용)
 }
 
 struct VehicleLocationWidgetEntryView: View {

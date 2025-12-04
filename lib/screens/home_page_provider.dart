@@ -918,7 +918,7 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
     const dongs = ['101동', '102동', '103동', '104동', '105동', '106동'];
 
     return DropdownButtonFormField<String>(
-      value: _selectedDong,
+      initialValue: _selectedDong,
       decoration: InputDecoration(
         labelText: '동',
         filled: true,
@@ -1673,7 +1673,7 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
                             }
                           }
                         },
-                        activeColor: Theme.of(context).primaryColor,
+                        activeThumbColor: Theme.of(context).primaryColor,
                         contentPadding: EdgeInsets.zero,
                       );
                     },
@@ -1686,6 +1686,53 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
                       fontSize: 12,
                     ),
                   ),
+                  // iOS에서 위젯 디버그 버튼 표시 (Release 모드에서도 테스트 가능)
+                  if (Platform.isIOS) ...[
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Text(
+                      '🔧 디버그',
+                      style: TextStyle(
+                        color: isDark ? Colors.white70 : Colors.grey.shade700,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _showWidgetDebugInfo(context, isDark),
+                      icon: const Icon(Icons.bug_report, size: 18),
+                      label: const Text('위젯 디버그 정보'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange.shade600,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () async {
+                        await HomeWidgetService.forceRefreshIOSWidget();
+                        if (mounted) {
+                          _showSnackBar('iOS 위젯 새로고침 요청 완료');
+                        }
+                      },
+                      icon: const Icon(Icons.refresh, size: 18),
+                      label: const Text('위젯 강제 새로고침'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade600,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               actions: [
@@ -1708,6 +1755,130 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
           },
         );
       },
+    );
+  }
+
+  // iOS 위젯 디버그 정보 표시 다이얼로그
+  Future<void> _showWidgetDebugInfo(BuildContext parentContext, bool isDark) async {
+    // 디버그 정보 조회 (로딩 다이얼로그 없이 진행)
+    final debugInfo = await HomeWidgetService.getWidgetDebugInfo();
+
+    if (!mounted) return;
+
+    // 디버그 정보 표시
+    showDialog(
+      // ignore: use_build_context_synchronously
+      context: parentContext,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        title: Row(
+          children: [
+            Icon(Icons.bug_report, color: Colors.orange.shade600),
+            const SizedBox(width: 8),
+            Text(
+              '위젯 디버그 정보',
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDebugSection(isDark, '사용자 정보', [
+                '동: ${debugInfo['user_dong'] ?? 'N/A'}',
+                '호: ${debugInfo['user_ho'] ?? 'N/A'}',
+                '시리얼: ${(debugInfo['user_serial_number'] as String?)?.isNotEmpty == true ? '***' : 'N/A'}',
+              ]),
+              const SizedBox(height: 16),
+              _buildDebugSection(isDark, '위젯 데이터', [
+                '층 정보: ${debugInfo['floor_info'] ?? 'N/A'}',
+                '색상 키: ${debugInfo['floor_color'] ?? 'N/A'}',
+                '상태 텍스트: ${debugInfo['status_text'] ?? 'N/A'}',
+              ]),
+              const SizedBox(height: 16),
+              _buildDebugSection(isDark, '마지막 업데이트', [
+                '시간: ${debugInfo['last_update_time'] ?? 'N/A'}',
+                '경과: ${debugInfo['last_update_ago'] ?? 'N/A'}',
+              ]),
+              const SizedBox(height: 16),
+              _buildDebugSection(isDark, 'iOS 위젯 상태', [
+                '자동 새로고침: ${debugInfo['widget_auto_refresh'] == true ? '✅ 활성화' : '❌ 비활성화'}',
+                '새로고침 횟수: ${debugInfo['widget_refresh_count'] ?? 0}회',
+                '마지막 새로고침: ${debugInfo['widget_last_refresh_ago'] ?? 'N/A'}',
+                '서버 요청 성공: ${debugInfo['widget_last_fetch_success'] == true ? '✅' : '❌'}',
+              ]),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              _showWidgetDebugInfo(parentContext, isDark); // 새로고침
+            },
+            child: Text(
+              '새로고침',
+              style: TextStyle(color: Colors.blue.shade600),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              '닫기',
+              style: TextStyle(color: Theme.of(dialogContext).primaryColor),
+            ),
+          ),
+        ],
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+      ),
+    );
+  }
+
+  // 디버그 섹션 빌더
+  Widget _buildDebugSection(bool isDark, String title, List<String> items) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            color: isDark ? Colors.white70 : Colors.grey.shade700,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? Colors.black26 : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(
+                item,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            )).toList(),
+          ),
+        ),
+      ],
     );
   }
 }

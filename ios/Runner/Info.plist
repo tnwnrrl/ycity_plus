@@ -95,5 +95,7 @@
 			</array>
 		</dict>
 	</array>
+	<key>AppGroupId</key>
+	<string>group.com.ilsan-ycity.ilsanycityplus</string>
 </dict>
 </plist>

@@ -565,6 +565,9 @@ class HomeWidgetService {
   // 🔍 디버그: 위젯 새로고침 상태 확인 (iOS 전용)
   static Future<Map<String, dynamic>> getWidgetDebugInfo() async {
     try {
+      // ⚠️ 중요: 데이터 읽기 전에 App Group 설정 필수
+      await HomeWidget.setAppGroupId(_appGroupId);
+
       final debugInfo = <String, dynamic>{};
 
       // 사용자 정보 확인
