@@ -289,29 +289,31 @@ class WidgetUpdateWorker(
      */
     private fun extractFloorFromHTML(html: String): String {
         android.util.Log.d("WidgetUpdateWorker", "HTML 파싱 시작")
-        
-        // B1-B4 층 정보 패턴 검색
-        val floorPattern = Pattern.compile("(?i)B[1-4](?:층)?", Pattern.CASE_INSENSITIVE)
-        val matcher = floorPattern.matcher(html)
-        
-        if (matcher.find()) {
-            var floorCode = matcher.group()
-            // "층" 제거하고 대문자로 정규화
-            floorCode = floorCode.replace("층", "").uppercase()
-            
-            android.util.Log.d("WidgetUpdateWorker", "층 정보 발견: $floorCode")
+
+        // 1순위: carFloorNameArea 클래스에서 층 정보 추출 (가장 정확)
+        val carFloorPattern = Pattern.compile("class=\"carFloorNameArea\"[^>]*>\\s*(B[1-4])\\s*<")
+        val carFloorMatcher = carFloorPattern.matcher(html)
+        if (carFloorMatcher.find()) {
+            val floorCode = carFloorMatcher.group(1).uppercase()
+            android.util.Log.d("WidgetUpdateWorker", "carFloorNameArea에서 층 정보 발견: $floorCode")
             return floorCode
         }
-        
-        // 출차 관련 키워드 검색
-        val exitKeywords = arrayOf("출차", "서비스", "없음", "확인", "불가")
-        for (keyword in exitKeywords) {
-            if (html.contains(keyword)) {
-                android.util.Log.d("WidgetUpdateWorker", "출차 키워드 발견: $keyword")
-                return "출차됨"
-            }
+
+        // 2순위: td/span/div 태그 안에서 B1-B4만 있는 경우 (Flutter와 유사)
+        val tagFloorPattern = Pattern.compile("<(?:td|span|div)[^>]*>\\s*(B[1-4])\\s*</(?:td|span|div)>", Pattern.CASE_INSENSITIVE)
+        val tagMatcher = tagFloorPattern.matcher(html)
+        if (tagMatcher.find()) {
+            val floorCode = tagMatcher.group(1).uppercase()
+            android.util.Log.d("WidgetUpdateWorker", "태그에서 층 정보 발견: $floorCode")
+            return floorCode
         }
-        
+
+        // 3순위: 출차 관련 키워드 검색
+        if (html.contains("서비스 지역에 없음") || html.contains("출차")) {
+            android.util.Log.d("WidgetUpdateWorker", "출차 키워드 발견")
+            return "출차됨"
+        }
+
         android.util.Log.d("WidgetUpdateWorker", "층 정보를 찾을 수 없음, 출차됨으로 표시")
         return "출차됨"
     }

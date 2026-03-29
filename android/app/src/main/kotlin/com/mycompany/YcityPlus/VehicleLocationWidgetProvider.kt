@@ -18,12 +18,29 @@ import java.util.regex.Pattern
 
 class VehicleLocationWidgetProvider : AppWidgetProvider() {
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        android.util.Log.d("VehicleLocationWidget", "onEnabled - 첫 위젯 추가됨, 알람 시작")
+        // 첫 위젯이 추가되면 5분 주기 알람 시작
+        WidgetAlarmReceiver.scheduleAlarm(context)
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        android.util.Log.d("VehicleLocationWidget", "onDisabled - 마지막 위젯 제거됨, 알람 취소")
+        // 마지막 위젯이 제거되면 알람 취소
+        WidgetAlarmReceiver.cancelAlarm(context)
+    }
+
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
         android.util.Log.d("VehicleLocationWidget", "onUpdate 호출됨 - 위젯 개수: ${appWidgetIds.size}")
+
+        // 알람이 설정되어 있지 않으면 시작 (앱 재시작 등의 경우 대비)
+        WidgetAlarmReceiver.scheduleAlarm(context)
         
         for (appWidgetId in appWidgetIds) {
             updateAppWidget(context, appWidgetManager, appWidgetId)
@@ -244,22 +261,27 @@ class VehicleLocationWidgetProvider : AppWidgetProvider() {
     // HTML에서 층 정보 추출 (단일차량 폴백용)
     private fun extractFloorFromHTML(html: String): String {
         android.util.Log.d("VehicleLocationWidget", "HTML 파싱 시작")
-        
-        // B1-B4 층 정보 패턴 검색
-        val floorPattern = Pattern.compile("(?i)B[1-4](?:층)?", Pattern.CASE_INSENSITIVE)
-        val matcher = floorPattern.matcher(html)
-        
-        if (matcher.find()) {
-            var floorCode = matcher.group()
-            // "층" 제거하고 대문자로 정규화
-            floorCode = floorCode.replace("층", "").uppercase()
-            
-            android.util.Log.d("VehicleLocationWidget", "층 정보 발견: $floorCode")
+
+        // 1순위: carFloorNameArea 클래스에서 층 정보 추출 (가장 정확)
+        val carFloorPattern = Pattern.compile("class=\"carFloorNameArea\"[^>]*>\\s*(B[1-4])\\s*<")
+        val carFloorMatcher = carFloorPattern.matcher(html)
+        if (carFloorMatcher.find()) {
+            val floorCode = carFloorMatcher.group(1).uppercase()
+            android.util.Log.d("VehicleLocationWidget", "carFloorNameArea에서 층 정보 발견: $floorCode")
             return floorCode
         }
-        
-        // 출차 관련 키워드 검색
-        val exitKeywords = arrayOf("출차", "서비스", "없음", "확인", "불가")
+
+        // 2순위: td/span/div 태그 안에서 B1-B4만 있는 경우 (Flutter와 유사)
+        val tagFloorPattern = Pattern.compile("<(?:td|span|div)[^>]*>\\s*(B[1-4])\\s*</(?:td|span|div)>", Pattern.CASE_INSENSITIVE)
+        val tagMatcher = tagFloorPattern.matcher(html)
+        if (tagMatcher.find()) {
+            val floorCode = tagMatcher.group(1).uppercase()
+            android.util.Log.d("VehicleLocationWidget", "태그에서 층 정보 발견: $floorCode")
+            return floorCode
+        }
+
+        // 3순위: 출차 관련 키워드 검색
+        val exitKeywords = arrayOf("서비스 지역에 없음", "출차")
         for (keyword in exitKeywords) {
             if (html.contains(keyword)) {
                 android.util.Log.d("VehicleLocationWidget", "출차 키워드 발견: $keyword")
