@@ -86,12 +86,13 @@ class WidgetUpdateWorker(
     override suspend fun doWork(): Result {
         return try {
             android.util.Log.d("WidgetUpdateWorker", "백그라운드 위젯 업데이트 작업 시작")
-            
-            // 입력 데이터에서 사용자 정보 가져오기
-            val dong = inputData.getString("dong") ?: ""
-            val ho = inputData.getString("ho") ?: ""
-            val serialNumber = inputData.getString("serialNumber") ?: ""
-            
+
+            // SharedPreferences에서 최신 사용자 정보 읽기 (inputData는 스케줄 시점의 old 정보일 수 있음)
+            val prefs = HomeWidgetPlugin.getData(applicationContext)
+            val dong = prefs.getString("flutter.user_dong", "") ?: ""
+            val ho = prefs.getString("flutter.user_ho", "") ?: ""
+            val serialNumber = prefs.getString("flutter.user_serial_number", "") ?: ""
+
             if (dong.isEmpty() || ho.isEmpty() || serialNumber.isEmpty()) {
                 android.util.Log.e("WidgetUpdateWorker", "사용자 정보가 불완전함: ${dong}동 ${ho}호 $serialNumber")
                 return Result.failure()
@@ -182,15 +183,14 @@ class WidgetUpdateWorker(
                 
                 android.util.Log.d("WidgetUpdateWorker", "추출된 정보: $floorInfo ($colorKey)")
                 
-                // SharedPreferences에 저장 (flutter. 접두사 사용하여 Flutter와 일관성 유지)
+                // SharedPreferences에 저장 (commit: 동기 쓰기로 위젯 업데이트 전 보장)
                 val widgetData = HomeWidgetPlugin.getData(applicationContext)
                 val editor = widgetData.edit()
                 editor.putString("flutter.floor_info", floorInfo)
                 editor.putString("flutter.floor_color", colorKey)
                 editor.putString("flutter.status_text", statusText)
-                // 마지막 업데이트 시간 저장
                 editor.putLong("flutter.last_update_timestamp", System.currentTimeMillis())
-                editor.apply()
+                editor.commit()
                 
                 connection.disconnect()
                 true
@@ -332,19 +332,22 @@ class WidgetUpdateWorker(
     }
 
     /**
-     * 모든 위젯 업데이트
+     * 모든 위젯 업데이트 (broadcast 방식: 직접 호출 시 내부 HTTP 스레드가 doWork 완료 후 죽는 문제 방지)
      */
     private fun updateAllWidgets() {
         try {
             val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
             val componentName = ComponentName(applicationContext, VehicleLocationWidgetProvider::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-            
+
             android.util.Log.d("WidgetUpdateWorker", "위젯 업데이트 트리거: ${appWidgetIds.size}개 위젯")
-            
+
             if (appWidgetIds.isNotEmpty()) {
-                val widgetProvider = VehicleLocationWidgetProvider()
-                widgetProvider.onUpdate(applicationContext, appWidgetManager, appWidgetIds)
+                val intent = Intent(applicationContext, VehicleLocationWidgetProvider::class.java).apply {
+                    action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, appWidgetIds)
+                }
+                applicationContext.sendBroadcast(intent)
             }
         } catch (e: Exception) {
             android.util.Log.e("WidgetUpdateWorker", "위젯 업데이트 트리거 중 오류", e)

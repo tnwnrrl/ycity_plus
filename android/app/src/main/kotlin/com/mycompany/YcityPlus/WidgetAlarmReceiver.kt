@@ -97,11 +97,16 @@ class WidgetAlarmReceiver : BroadcastReceiver() {
 
         when (intent.action) {
             ACTION_REFRESH, Intent.ACTION_BOOT_COMPLETED -> {
-                // 서버에서 데이터 가져와서 위젯 업데이트
-                refreshWidgetData(context)
-
-                // 다음 알람 예약 (반복 알람 대신 one-shot으로 체이닝)
-                scheduleAlarm(context)
+                // goAsync()로 BroadcastReceiver 생명주기 연장 (HTTP 완료까지 보장)
+                val pendingResult = goAsync()
+                Executors.newSingleThreadExecutor().execute {
+                    try {
+                        refreshWidgetData(context)
+                        scheduleAlarm(context)
+                    } finally {
+                        pendingResult.finish()
+                    }
+                }
             }
         }
     }
@@ -165,13 +170,13 @@ class WidgetAlarmReceiver : BroadcastReceiver() {
 
                     android.util.Log.d(TAG, "추출된 정보: $floorInfo ($colorKey)")
 
-                    // SharedPreferences에 저장
+                    // SharedPreferences에 저장 (commit: 동기 쓰기로 위젯 업데이트 전 보장)
                     val editor = widgetData.edit()
                     editor.putString("flutter.floor_info", floorInfo)
                     editor.putString("flutter.floor_color", colorKey)
                     editor.putString("flutter.status_text", statusText)
                     editor.putLong("flutter.last_update_timestamp", System.currentTimeMillis())
-                    editor.apply()
+                    editor.commit()
 
                     // 위젯 업데이트 트리거
                     updateAllWidgets(context)
