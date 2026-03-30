@@ -52,15 +52,15 @@ class WidgetAlarmReceiver : BroadcastReceiver() {
             // 5분마다 반복 알람 설정
             val triggerTime = SystemClock.elapsedRealtime() + REFRESH_INTERVAL_MS
 
+            // setAndAllowWhileIdle: 정확한 타이밍 불필요, SCHEDULE_EXACT_ALARM 권한 불필요
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                // Doze 모드에서도 동작하도록 setExactAndAllowWhileIdle 사용
-                alarmManager.setExactAndAllowWhileIdle(
+                alarmManager.setAndAllowWhileIdle(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
                     triggerTime,
                     pendingIntent
                 )
             } else {
-                alarmManager.setExact(
+                alarmManager.set(
                     AlarmManager.ELAPSED_REALTIME_WAKEUP,
                     triggerTime,
                     pendingIntent
