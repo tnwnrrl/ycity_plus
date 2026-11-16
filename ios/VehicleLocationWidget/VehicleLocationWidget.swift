@@ -185,12 +185,17 @@ func fetchLatestVehicleLocation(dong: String, ho: String, serialNumber: String, 
         
         print("[VehicleLocationWidget] 서버 응답 수신, HTML 길이: \(htmlString.count)")
         
+        let vehicleFloors = parseVehicleFloors(htmlString)
+
         // 앱이 꺼져 있어도 주차 기록에 반영되도록 층 변화를 대기열에 남김
         recordParkingEvents(userDefaults: userDefaults, dong: dong, ho: ho, serialNumber: serialNumber,
-                            floors: parseVehicleFloors(htmlString))
+                            floors: vehicleFloors)
 
-        // HTML에서 층 정보 추출
-        let floorInfo = extractFloorFromHTML(htmlString)
+        // 차량 행에서 읽은 선택 차량(없으면 첫 차량)의 층을 우선 사용, 행을 못 읽으면 전체 HTML 에서 추출
+        let selectedVehicle = userDefaults?.integer(forKey: "flutter.selected_vehicle_index") ?? 1
+        let floorInfo = vehicleFloors[selectedVehicle]
+            ?? vehicleFloors.sorted(by: { $0.key < $1.key }).first?.value
+            ?? extractFloorFromHTML(htmlString)
         let colorKey = getFloorColorKey(floorInfo)
         let statusText = floorInfo == "출차됨" ? "출차됨" : "현재 차량 위치"
         
@@ -209,13 +214,17 @@ func fetchLatestVehicleLocation(dong: String, ho: String, serialNumber: String, 
 }
 
 // HTML에서 층 정보 추출
-func extractFloorFromHTML(_ html: String) -> String {
+func extractFloorFromHTML(_ rawHTML: String) -> String {
     print("[VehicleLocationWidget] HTML 파싱 시작")
-    
+
+    // 세션 ID(16진수)에 섞인 "B2" 같은 글자가 층으로 잡히지 않도록 먼저 지운다
+    let html = rawHTML.replacingOccurrences(
+        of: "jsessionid=[0-9A-Fa-f]+", with: "", options: .regularExpression)
+
     // B1-B4 층 정보 패턴 검색
     let floorPattern = "(?i)B[1-4](?:층)?"
     if let regex = try? NSRegularExpression(pattern: floorPattern) {
-        let range = NSRange(location: 0, length: html.count)
+        let range = NSRange(html.startIndex..., in: html)
         if let match = regex.firstMatch(in: html, range: range) {
             let matchRange = Range(match.range, in: html)!
             var floorCode = String(html[matchRange])
