@@ -319,15 +319,7 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
         if (mounted) {
           final vehicleLocationProvider =
               context.read<VehicleLocationProvider>();
-          // 다중 차량 API를 먼저 시도
-          await vehicleLocationProvider.fetchMultipleVehicleLocation(
-              userInfo: currentUser);
-          
-          // 단일 차량 호환성을 위해 기존 API도 호출 (다중 차량이 없는 경우)
-          if (!vehicleLocationProvider.hasMultipleVehicles) {
-            vehicleLocationProvider.fetchWithCacheOptimistic(
-                userInfo: currentUser);
-          }
+          await vehicleLocationProvider.fetchLocation(userInfo: currentUser);
         }
 
         if (kDebugMode) {
@@ -363,17 +355,9 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
         
         // 비동기 작업을 Future.microtask로 처리
         Future.microtask(() async {
-          // 다중 차량 API를 우선 사용 (자동 업데이트)
-          await vehicleLocationProvider.fetchMultipleVehicleLocation(
+          await vehicleLocationProvider.fetchLocation(
             userInfo: userInfoProvider.currentUser!,
           );
-          
-          // 단일 차량 호환성
-          if (!vehicleLocationProvider.hasMultipleVehicles) {
-            vehicleLocationProvider.fetchWithCacheOptimistic(
-              userInfo: userInfoProvider.currentUser!,
-            );
-          }
         });
 
         if (kDebugMode) {
@@ -426,19 +410,10 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
         if (mounted && userInfoProvider.hasCurrentUser) {
           final vehicleLocationProvider =
               context.read<VehicleLocationProvider>();
-          // 다중 차량 API를 우선 사용
-          await vehicleLocationProvider.fetchMultipleVehicleLocation(
+          await vehicleLocationProvider.fetchLocation(
             userInfo: userInfoProvider.currentUser!,
             forceRefresh: true,
           );
-          
-          // 단일 차량 호환성
-          if (!vehicleLocationProvider.hasMultipleVehicles) {
-            vehicleLocationProvider.fetchWithCacheOptimistic(
-              userInfo: userInfoProvider.currentUser!,
-              forceRefresh: true,
-            );
-          }
 
           // 주차 이력도 새로고침
           if (mounted) {
@@ -472,20 +447,10 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
     if (!mounted) return;
     final vehicleLocationProvider = context.read<VehicleLocationProvider>();
 
-    // 다중 차량 API를 우선 사용하고 단일 차량으로 폴백
-    await vehicleLocationProvider.fetchMultipleVehicleLocation(
+    await vehicleLocationProvider.fetchLocation(
       userInfo: userInfoProvider.currentUser!,
       forceRefresh: true,
     );
-
-    if (!mounted) return;
-    // 다중 차량이 감지되지 않으면 기존 단일 차량 API도 시도 (호환성)
-    if (!vehicleLocationProvider.hasMultipleVehicles) {
-      await vehicleLocationProvider.fetchWithCacheOptimistic(
-        userInfo: userInfoProvider.currentUser!,
-        forceRefresh: true,
-      );
-    }
 
     if (!mounted) return;
     if (vehicleLocationProvider.locationError != null) {

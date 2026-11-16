@@ -241,15 +241,24 @@ class VehicleLocationProvider extends ChangeNotifier {
     }
   }
 
-  /// 차량 위치 정보 새로고침 (다중 차량 우선)
-  Future<void> refreshVehicleLocation(UserInfo userInfo) async {
-    // 다중 차량 API를 먼저 시도
-    await fetchMultipleVehicleLocation(userInfo: userInfo, forceRefresh: true);
-    
-    // 호환성: 단일 차량 API도 호출 (기존 코드 대응)
-    if (!_isMultipleVehicleMode) {
-      await fetchVehicleLocation(userInfo: userInfo, forceRefresh: true);
+  /// 차량 위치 조회 (다중 차량 API 하나로 단일·다중 차량 모두 처리)
+  /// 다중 차량 API 가 단일 차량도 1개짜리 목록으로 돌려주므로, 단일 차량 API 는
+  /// 다중 차량 조회가 실패했을 때만 재시도용으로 부른다.
+  Future<void> fetchLocation({
+    required UserInfo userInfo,
+    bool forceRefresh = false,
+  }) async {
+    await fetchMultipleVehicleLocation(
+        userInfo: userInfo, forceRefresh: forceRefresh);
+    if (_locationError != null) {
+      await fetchWithCacheOptimistic(
+          userInfo: userInfo, forceRefresh: forceRefresh);
     }
+  }
+
+  /// 차량 위치 정보 새로고침 (다중 차량 우선)
+  Future<void> refreshVehicleLocation(UserInfo userInfo) {
+    return fetchLocation(userInfo: userInfo, forceRefresh: true);
   }
   
   /// 차량 선택
