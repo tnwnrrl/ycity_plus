@@ -185,6 +185,10 @@ func fetchLatestVehicleLocation(dong: String, ho: String, serialNumber: String, 
         
         print("[VehicleLocationWidget] 서버 응답 수신, HTML 길이: \(htmlString.count)")
         
+        // 앱이 꺼져 있어도 주차 기록에 반영되도록 층 변화를 대기열에 남김
+        recordParkingEvents(userDefaults: userDefaults, dong: dong, ho: ho, serialNumber: serialNumber,
+                            floors: parseVehicleFloors(htmlString))
+
         // HTML에서 층 정보 추출
         let floorInfo = extractFloorFromHTML(htmlString)
         let colorKey = getFloorColorKey(floorInfo)
@@ -235,6 +239,80 @@ func extractFloorFromHTML(_ html: String) -> String {
     
     print("[VehicleLocationWidget] 층 정보를 찾을 수 없음, 출차됨으로 표시")
     return "출차됨"
+}
+
+// MARK: - 백그라운드 층 변화 대기열 (Flutter BackgroundParkingEventService, Android ParkingEventQueue 와 같은 형식)
+// flutter.parking_event_queue = [{"t": 밀리초, "u": "동|호|시리얼", "v": 차량 순서, "f": "B1"|"출차됨"}]
+// 위젯은 대기열에 덧붙이기만 하고, 앱은 flutter.parking_event_cursor 에 반영한 위치만 쓴다.
+
+private let parkingEventQueueKey = "flutter.parking_event_queue"
+private let parkingEventCursorKey = "flutter.parking_event_cursor"
+private let parkingEventMaxCount = 200
+
+/// 서버 HTML 의 차량 행(tagLocationAction)마다 차량 번호와 층을 읽는다.
+/// 층을 확실히 읽지 못한 차량은 빼서, 잘못된 출차가 기록되지 않게 한다.
+func parseVehicleFloors(_ html: String) -> [Int: String] {
+    var result: [Int: String] = [:]
+    let rows = html.components(separatedBy: "tagLocationAction(").dropFirst()
+    for (offset, rawRow) in rows.enumerated() {
+        // 행 하나는 다음 </tr> 까지 (마지막 행이 페이지 끝 스크립트 문구까지 포함하지 않도록)
+        let row = rawRow.components(separatedBy: "</tr>").first ?? rawRow
+        let vehicle = firstCapture(in: row, pattern: "class=\"carNameArea\">\\s*(\\d+)\\s*<").flatMap { Int($0) } ?? (offset + 1)
+        let floorText = (firstCapture(in: row, pattern: "class=\"carFloorNameArea\">\\s*([^<]*?)\\s*<") ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if floorText.range(of: "^B[1-4]$", options: [.regularExpression, .caseInsensitive]) != nil {
+            result[vehicle] = floorText.uppercased()
+        } else if row.contains("없음") {
+            result[vehicle] = "출차됨"
+        }
+    }
+    return result
+}
+
+private func firstCapture(in text: String, pattern: String) -> String? {
+    guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+    let range = NSRange(text.startIndex..., in: text)
+    guard let match = regex.firstMatch(in: text, range: range), match.numberOfRanges > 1,
+          let captured = Range(match.range(at: 1), in: text) else { return nil }
+    return String(text[captured])
+}
+
+/// 읽은 층이 직전 대기 기록과 다르면 대기열에 덧붙인다
+func recordParkingEvents(userDefaults: UserDefaults?, dong: String, ho: String, serialNumber: String, floors: [Int: String]) {
+    guard let userDefaults = userDefaults, !floors.isEmpty else { return }
+
+    let cursor = Int64(userDefaults.string(forKey: parkingEventCursorKey) ?? "") ?? 0
+    var existing: [[String: Any]] = []
+    if let raw = userDefaults.string(forKey: parkingEventQueueKey),
+       let data = raw.data(using: .utf8),
+       let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+        existing = parsed
+    }
+
+    // 앱이 이미 반영한 항목은 버린다
+    var pending = existing.filter { (($0["t"] as? NSNumber)?.int64Value ?? 0) > cursor }
+
+    let userKey = "\(dong)|\(ho)|\(serialNumber)"
+    let now = Int64(Date().timeIntervalSince1970 * 1000)
+    var appended = 0
+    for (vehicle, floor) in floors.sorted(by: { $0.key < $1.key }) {
+        let lastFloor = pending.last {
+            ($0["u"] as? String) == userKey && ($0["v"] as? NSNumber)?.intValue == vehicle
+        }?["f"] as? String
+        if lastFloor != floor {
+            pending.append(["t": NSNumber(value: now), "u": userKey, "v": NSNumber(value: vehicle), "f": floor])
+            appended += 1
+        }
+    }
+
+    if appended == 0 && pending.count == existing.count { return }
+
+    let trimmed = Array(pending.suffix(parkingEventMaxCount))
+    if let data = try? JSONSerialization.data(withJSONObject: trimmed),
+       let json = String(data: data, encoding: .utf8) {
+        userDefaults.set(json, forKey: parkingEventQueueKey)
+        widgetLogger.info("🅿️ 층 변화 \(appended)건 기록 (대기 \(trimmed.count)건)")
+    }
 }
 
 func getFloorColorKey(_ floorCode: String) -> String {

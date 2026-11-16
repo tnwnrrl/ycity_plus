@@ -153,6 +153,9 @@ class WidgetAlarmReceiver : BroadcastReceiver() {
                     val response = reader.use { it.readText() }
 
                     android.util.Log.d(TAG, "서버 응답 수신, HTML 길이: ${response.length}")
+                    
+                    // 앱이 꺼져 있어도 주차 기록에 반영되도록 층 변화를 대기열에 남김
+                    ParkingEventQueue.record(context, dong, ho, serialNumber, response)
 
                     // 선택된 차량 인덱스 확인
                     val selectedVehicleIndex = widgetData.getInt("flutter.selected_vehicle_index", 1)

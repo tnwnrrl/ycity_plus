@@ -41,6 +41,15 @@ class ParkingHistoryService {
         vehicleIndex: floorInfo.vehicleIndex,
       );
 
+      // 현재 기록의 입차보다 앞선 이벤트는 이미 지난 상황이므로 무시
+      // (백그라운드 대기열이 앱의 실시간 기록보다 늦게 반영될 때)
+      if (current != null &&
+          floorInfo.lastUpdated.isBefore(current.entryTime)) {
+        _log(
+            '차량 ${floorInfo.vehicleIndex}: 현재 기록(${current.entryTime})보다 오래된 이벤트 무시: ${floorInfo.floor}');
+        return true;
+      }
+
       // 출차됨 상태 처리
       if (floorInfo.floor == '출차됨') {
         return await _handleDepartureEvent(floorInfo, current);

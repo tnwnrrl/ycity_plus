@@ -163,6 +163,9 @@ class WidgetUpdateWorker(
                 
                 android.util.Log.d("WidgetUpdateWorker", "서버 응답 수신, HTML 길이: ${response.length}")
                 
+                // 앱이 꺼져 있어도 주차 기록에 반영되도록 층 변화를 대기열에 남김
+                ParkingEventQueue.record(applicationContext, dong, ho, serialNumber, response)
+                
                 // 선택된 차량 인덱스 확인 (flutter. 접두사 사용)
                 val updatedData = HomeWidgetPlugin.getData(applicationContext)
                 val selectedVehicleIndex = updatedData.getInt("flutter.selected_vehicle_index", 1)

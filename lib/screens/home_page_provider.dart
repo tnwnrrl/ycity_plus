@@ -11,9 +11,11 @@ import '../providers/user_info_provider.dart';
 import '../providers/vehicle_location_provider.dart';
 import '../providers/parking_history_provider.dart';
 import '../models/parking_floor_info.dart';
+import '../models/user_info.dart';
 import '../screens/vehicle_location_screen.dart';
 import '../screens/parking_history_screen.dart';
 import '../services/home_widget_service.dart';
+import '../services/background_parking_event_service.dart';
 import '../services/android_resolution_warning_service.dart';
 
 /// Provider 패턴을 사용하는 새로운 HomePage
@@ -38,6 +40,7 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
   static const String _noVehicleInfoMessage = '등록된 차량 정보가 없습니다';
 
   final _formKey = GlobalKey<FormState>();
+  final _backgroundParkingEventService = BackgroundParkingEventService();
 
   // 컨트롤러들
   final TextEditingController _hoController = TextEditingController();
@@ -287,6 +290,9 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
         });
       }
 
+      // 앱이 꺼져 있는 동안 위젯이 본 층 변화를 먼저 주차 기록에 반영
+      await _importBackgroundParkingEvents(currentUser);
+
       // 주차 이력을 먼저 로드하여 마지막 주차 층 정보를 확인
       if (mounted) {
         final parkingHistoryProvider = context.read<ParkingHistoryProvider>();
@@ -435,6 +441,18 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
     }
   }
 
+  /// 위젯 백그라운드 조회가 쌓아 둔 층 변화를 주차 기록에 반영
+  Future<void> _importBackgroundParkingEvents(UserInfo user) async {
+    final imported = await _backgroundParkingEventService.importEvents(
+      dong: user.dong,
+      ho: user.ho,
+      serialNumber: user.serialNumber,
+    );
+    if (imported > 0 && mounted) {
+      await context.read<ParkingHistoryProvider>().loadParkingHistory(user);
+    }
+  }
+
   /// 차량 위치 새로고침 (Phase 2.3: Optimistic Updates 적용)
   Future<void> _refreshLocationInfo() async {
     final userInfoProvider = context.read<UserInfoProvider>();
@@ -443,6 +461,9 @@ class _HomePageProviderState extends State<HomePageProvider> with WidgetsBinding
       _showSnackBar(_noVehicleInfoMessage);
       return;
     }
+
+    // 실시간 조회보다 앞선 시각의 백그라운드 이벤트를 먼저 반영 (기록 순서 유지)
+    await _importBackgroundParkingEvents(userInfoProvider.currentUser!);
 
     if (!mounted) return;
     final vehicleLocationProvider = context.read<VehicleLocationProvider>();
