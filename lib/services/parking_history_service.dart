@@ -12,62 +12,43 @@ class ParkingHistoryService {
 
   final DatabaseHelper _databaseHelper = DatabaseHelper();
 
-  // 현재 주차 상태 캐시
-  ParkingHistory? _currentParkingHistory;
-
-  /// 현재 주차 중인 이력
-  ParkingHistory? get currentParkingHistory => _currentParkingHistory;
-
-  /// 현재 주차 중인지 확인
-  bool get isCurrentlyParked =>
-      _currentParkingHistory?.isCurrentlyParked ?? false;
+  // 주차 이벤트 직렬화 (차량별 이벤트가 동시에 들어와도 DB 조회·기록이 겹치지 않도록)
+  Future<void> _eventQueue = Future.value();
 
   /// 서비스 초기화
   Future<void> initialize() async {
     try {
       _log('ParkingHistoryService 초기화 시작');
-      // 초기화 시에는 현재 주차 상태를 로드하지 않음 (필요시 별도 호출)
       _log('ParkingHistoryService 초기화 완료');
     } catch (e) {
       _log('ParkingHistoryService 초기화 중 오류 발생: $e');
     }
   }
 
-  /// 현재 주차 상태 로드
-  Future<void> loadCurrentParkingStatus({
-    required String dong,
-    required String ho,
-    required String serialNumber,
-  }) async {
-    try {
-      _currentParkingHistory = await _databaseHelper.getCurrentParkingHistory(
-        dong: dong,
-        ho: ho,
-        serialNumber: serialNumber,
-      );
-
-      if (_currentParkingHistory != null) {
-        _log('현재 주차 중인 이력 로드: ${_currentParkingHistory!.floor}층');
-      } else {
-        _log('현재 주차 중인 이력 없음');
-      }
-    } catch (e) {
-      _log('현재 주차 상태 로드 중 오류 발생: $e');
-      _currentParkingHistory = null;
-    }
+  /// 새로운 주차 이벤트 처리 (차량별로 현재 주차 이력을 DB에서 조회해 판단)
+  Future<bool> handleParkingEvent(ParkingFloorInfo floorInfo) {
+    final result = _eventQueue.then((_) => _processParkingEvent(floorInfo));
+    _eventQueue = result.then((_) {});
+    return result;
   }
 
-  /// 새로운 주차 이벤트 처리
-  Future<bool> handleParkingEvent(ParkingFloorInfo floorInfo) async {
+  Future<bool> _processParkingEvent(ParkingFloorInfo floorInfo) async {
     try {
+      final current = await _databaseHelper.getCurrentParkingHistory(
+        dong: floorInfo.dong,
+        ho: floorInfo.ho,
+        serialNumber: floorInfo.serialNumber,
+        vehicleIndex: floorInfo.vehicleIndex,
+      );
+
       // 출차됨 상태 처리
       if (floorInfo.floor == '출차됨') {
-        return await _handleDepartureEvent(floorInfo);
+        return await _handleDepartureEvent(floorInfo, current);
       }
 
       // 실제 층 정보가 있는 경우 입차 처리
       if (_isValidFloor(floorInfo.floor)) {
-        return await _handleArrivalEvent(floorInfo);
+        return await _handleArrivalEvent(floorInfo, current);
       }
 
       _log('알 수 없는 층 정보: ${floorInfo.floor}');
@@ -79,19 +60,20 @@ class ParkingHistoryService {
   }
 
   /// 입차 이벤트 처리
-  Future<bool> _handleArrivalEvent(ParkingFloorInfo floorInfo) async {
+  Future<bool> _handleArrivalEvent(
+      ParkingFloorInfo floorInfo, ParkingHistory? current) async {
     try {
       // 기존에 주차 중인 이력이 있으면 먼저 출차 처리
-      if (_currentParkingHistory != null &&
-          _currentParkingHistory!.isCurrentlyParked) {
+      if (current != null) {
         // 같은 층에 이미 주차 중이면 무시
-        if (_currentParkingHistory!.floor == floorInfo.floor) {
-          _log('이미 ${floorInfo.floor}층에 주차 중 - 중복 입차 이벤트 무시');
+        if (current.floor == floorInfo.floor) {
+          _log(
+              '차량 ${floorInfo.vehicleIndex}: 이미 ${floorInfo.floor}층에 주차 중 - 중복 입차 이벤트 무시');
           return true;
         }
 
         // 다른 층으로 이동한 경우 기존 주차 완료 처리
-        await _finalizeParkingHistory(_currentParkingHistory!);
+        await _finalizeParkingHistory(current, exitTime: floorInfo.lastUpdated);
       }
 
       // 새로운 주차 이력 생성
@@ -99,6 +81,7 @@ class ParkingHistoryService {
         dong: floorInfo.dong,
         ho: floorInfo.ho,
         serialNumber: floorInfo.serialNumber,
+        vehicleIndex: floorInfo.vehicleIndex,
         floor: floorInfo.floor,
         entryTime: floorInfo.lastUpdated,
         notes: '자동 감지된 입차',
@@ -106,8 +89,8 @@ class ParkingHistoryService {
 
       final id = await _databaseHelper.insertParkingHistory(newHistory);
       if (id > 0) {
-        _currentParkingHistory = newHistory.copyWith(id: id);
-        _log('새로운 주차 이력 생성: ${floorInfo.floor}층 (ID: $id)');
+        _log(
+            '차량 ${floorInfo.vehicleIndex}: 새로운 주차 이력 생성: ${floorInfo.floor}층 (ID: $id)');
         return true;
       }
 
@@ -119,17 +102,16 @@ class ParkingHistoryService {
   }
 
   /// 출차 이벤트 처리
-  Future<bool> _handleDepartureEvent(ParkingFloorInfo floorInfo) async {
+  Future<bool> _handleDepartureEvent(
+      ParkingFloorInfo floorInfo, ParkingHistory? current) async {
     try {
-      if (_currentParkingHistory == null ||
-          !_currentParkingHistory!.isCurrentlyParked) {
-        _log('출차 이벤트 감지되었으나 주차 중인 이력이 없음');
+      if (current == null) {
+        _log('차량 ${floorInfo.vehicleIndex}: 출차 이벤트 감지되었으나 주차 중인 이력이 없음');
         return true; // 오류는 아니므로 true 반환
       }
 
       // 현재 주차 이력을 출차 완료로 업데이트
-      await _finalizeParkingHistory(_currentParkingHistory!,
-          exitTime: floorInfo.lastUpdated);
+      await _finalizeParkingHistory(current, exitTime: floorInfo.lastUpdated);
       return true;
     } catch (e) {
       _log('출차 이벤트 처리 중 오류 발생: $e');
@@ -166,8 +148,6 @@ class ParkingHistoryService {
               '주차 이력 완료 처리: ${history.floor}층, 주차시간: ${completedHistory.parkingDurationText}');
         }
       }
-
-      _currentParkingHistory = null; // 현재 주차 상태 초기화
     } catch (e) {
       _log('주차 이력 완료 처리 중 오류 발생: $e');
       rethrow;
@@ -289,12 +269,6 @@ class ParkingHistoryService {
       final deletedRows = await _databaseHelper.deleteParkingHistory(id);
       if (deletedRows > 0) {
         _log('주차 이력 삭제 완료: ID $id');
-
-        // 삭제된 이력이 현재 주차 이력이면 초기화
-        if (_currentParkingHistory?.id == id) {
-          _currentParkingHistory = null;
-        }
-
         return true;
       }
       return false;
@@ -333,12 +307,6 @@ class ParkingHistoryService {
       final id = await _databaseHelper.insertParkingHistory(history);
       if (id > 0) {
         _log('수동 주차 이력 추가 완료: $floor층 (ID: $id)');
-
-        // 현재 주차 중인 이력이면 캐시 업데이트
-        if (exitTime == null) {
-          _currentParkingHistory = history.copyWith(id: id);
-        }
-
         return true;
       }
       return false;
@@ -422,7 +390,6 @@ class ParkingHistoryService {
   /// 서비스 정리
   Future<void> dispose() async {
     try {
-      _currentParkingHistory = null;
       _log('ParkingHistoryService 정리 완료');
     } catch (e) {
       _log('ParkingHistoryService 정리 중 오류 발생: $e');

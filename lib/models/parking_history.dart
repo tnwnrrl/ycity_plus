@@ -6,6 +6,7 @@ class ParkingHistory {
   final String dong;
   final String ho;
   final String serialNumber;
+  final int vehicleIndex; // 차량 순서 (다중 차량 세대에서 차량 구분)
   final String floor;
   final DateTime entryTime;
   final DateTime? exitTime;
@@ -20,6 +21,7 @@ class ParkingHistory {
     required this.dong,
     required this.ho,
     required this.serialNumber,
+    this.vehicleIndex = 1,
     required this.floor,
     required this.entryTime,
     this.exitTime,
@@ -35,6 +37,7 @@ class ParkingHistory {
     required String dong,
     required String ho,
     required String serialNumber,
+    int vehicleIndex = 1,
     required String floor,
     DateTime? entryTime,
     String? notes,
@@ -44,6 +47,7 @@ class ParkingHistory {
       dong: dong,
       ho: ho,
       serialNumber: serialNumber,
+      vehicleIndex: vehicleIndex,
       floor: floor,
       entryTime: entryTime ?? now,
       status: ParkingStatus.parked,
@@ -74,6 +78,7 @@ class ParkingHistory {
       dong: map['dong'] as String,
       ho: map['ho'] as String,
       serialNumber: map['serial_number'] as String,
+      vehicleIndex: map['vehicle_index'] as int? ?? 1,
       floor: map['floor'] as String,
       entryTime: DateTime.parse(map['entry_time'] as String),
       exitTime: map['exit_time'] != null
@@ -96,6 +101,7 @@ class ParkingHistory {
       'dong': dong,
       'ho': ho,
       'serial_number': serialNumber,
+      'vehicle_index': vehicleIndex,
       'floor': floor,
       'entry_time': entryTime.toIso8601String(),
       'exit_time': exitTime?.toIso8601String(),
@@ -113,6 +119,7 @@ class ParkingHistory {
     String? dong,
     String? ho,
     String? serialNumber,
+    int? vehicleIndex,
     String? floor,
     DateTime? entryTime,
     DateTime? exitTime,
@@ -126,6 +133,7 @@ class ParkingHistory {
       dong: dong ?? this.dong,
       ho: ho ?? this.ho,
       serialNumber: serialNumber ?? this.serialNumber,
+      vehicleIndex: vehicleIndex ?? this.vehicleIndex,
       floor: floor ?? this.floor,
       entryTime: entryTime ?? this.entryTime,
       exitTime: exitTime ?? this.exitTime,

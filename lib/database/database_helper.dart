@@ -31,7 +31,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -59,6 +59,7 @@ class DatabaseHelper {
         dong TEXT NOT NULL,
         ho TEXT NOT NULL,
         serial_number TEXT NOT NULL,
+        vehicle_index INTEGER NOT NULL DEFAULT 1,
         floor TEXT NOT NULL,
         entry_time TEXT NOT NULL,
         exit_time TEXT,
@@ -119,6 +120,14 @@ class DatabaseHelper {
           .execute('CREATE INDEX idx_parking_floor ON parking_history(floor)');
 
       _log('주차 이력 테이블 및 인덱스 생성 완료');
+    }
+
+    // 버전 2에서 3으로 업그레이드: 다중 차량 구분용 차량 순서 컬럼 추가
+    // 기존 이력은 모두 1번 차량으로 간주
+    if (oldVersion < 3) {
+      await db.execute(
+          'ALTER TABLE parking_history ADD COLUMN vehicle_index INTEGER NOT NULL DEFAULT 1');
+      _log('주차 이력 vehicle_index 컬럼 추가 완료');
     }
   }
 
@@ -257,14 +266,15 @@ class DatabaseHelper {
     required String dong,
     required String ho,
     required String serialNumber,
+    int vehicleIndex = 1,
   }) async {
     try {
       final db = await database;
       final List<Map<String, dynamic>> maps = await db.query(
         'parking_history',
         where:
-            'dong = ? AND ho = ? AND serial_number = ? AND status = ? AND exit_time IS NULL',
-        whereArgs: [dong, ho, serialNumber, 'parked'],
+            'dong = ? AND ho = ? AND serial_number = ? AND vehicle_index = ? AND status = ? AND exit_time IS NULL',
+        whereArgs: [dong, ho, serialNumber, vehicleIndex, 'parked'],
         orderBy: 'entry_time DESC',
         limit: 1,
       );

@@ -1144,14 +1144,7 @@ class VehicleLocationService {
     // 백그라운드에서 실행하여 메인 요청을 블로킹하지 않음
     Future.microtask(() async {
       try {
-        // 주차 이력 서비스 초기화 (필요한 경우)
-        await _parkingHistoryService.loadCurrentParkingStatus(
-          dong: floorInfo.dong,
-          ho: floorInfo.ho,
-          serialNumber: floorInfo.serialNumber,
-        );
-
-        // 주차 이벤트 처리
+        // 주차 이벤트 처리 (차량별 현재 이력은 서비스가 직접 조회)
         final success =
             await _parkingHistoryService.handleParkingEvent(floorInfo);
 
