@@ -59,7 +59,6 @@ class _ParkingHistoryScreenState extends State<ParkingHistoryScreen>
           dong: widget.dong,
           ho: widget.ho,
           serialNumber: widget.serialNumber,
-          limit: 100,
         ),
         _parkingHistoryService.getThisMonthParkingHistory(
           dong: widget.dong,

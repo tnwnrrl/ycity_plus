@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -31,9 +33,12 @@ Future<List<ParkingHistory>> _allHistory() {
 }
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
+    // 테스트 파일들이 동시에 돌아도 DB 파일이 겹치지 않도록 파일마다 임시 폴더 사용
+    final dir = await Directory.systemTemp.createTemp('ycity_plus_test_');
+    await databaseFactory.setDatabasesPath(dir.path);
   });
 
   setUp(() async {

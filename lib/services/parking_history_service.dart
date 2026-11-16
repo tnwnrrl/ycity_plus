@@ -154,12 +154,12 @@ class ParkingHistoryService {
     }
   }
 
-  /// 주차 이력 조회
+  /// 주차 이력 조회 (limit 를 주지 않으면 전체 — 통계·목록·삭제가 같은 기록을 보도록)
   Future<List<ParkingHistory>> getParkingHistory({
     required String dong,
     required String ho,
     required String serialNumber,
-    int? limit = 50,
+    int? limit,
     DateTime? startDate,
     DateTime? endDate,
   }) async {

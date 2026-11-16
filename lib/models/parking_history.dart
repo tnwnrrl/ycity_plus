@@ -310,24 +310,19 @@ class ParkingStatistics {
   factory ParkingStatistics.fromHistory(List<ParkingHistory> history) {
     if (history.isEmpty) return ParkingStatistics.empty();
 
-    final completedHistory =
-        history.where((h) => h.parkingDuration != null).toList();
-    if (completedHistory.isEmpty) return ParkingStatistics.empty();
+    // 주차 시간 통계는 출차 완료된 기록으로만 계산 (주차 중인 기록은 시간 미확정)
+    final durations = history
+        .where((h) => h.parkingDuration != null)
+        .map((h) => h.parkingDuration!)
+        .toList()
+      ..sort((a, b) => a.inMilliseconds.compareTo(b.inMilliseconds));
 
-    // 총 주차 시간 계산
-    final totalTime =
-        completedHistory.map((h) => h.parkingDuration!).reduce((a, b) => a + b);
-
-    // 평균 주차 시간
-    final avgTime = Duration(
-      milliseconds: totalTime.inMilliseconds ~/ completedHistory.length,
-    );
-
-    // 최장/최단 주차 시간
-    final durations = completedHistory.map((h) => h.parkingDuration!).toList();
-    durations.sort((a, b) => a.inMilliseconds.compareTo(b.inMilliseconds));
-    final shortest = durations.first;
-    final longest = durations.last;
+    final totalTime = durations.fold(Duration.zero, (sum, d) => sum + d);
+    final avgTime = durations.isEmpty
+        ? Duration.zero
+        : Duration(milliseconds: totalTime.inMilliseconds ~/ durations.length);
+    final shortest = durations.isEmpty ? Duration.zero : durations.first;
+    final longest = durations.isEmpty ? Duration.zero : durations.last;
 
     // 층별 사용 횟수
     final floorCount = <String, int>{};
