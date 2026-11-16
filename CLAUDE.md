@@ -9,14 +9,14 @@ Flutter mobile application for apartment complex parking management with automat
 ## Essential Commands
 
 ```bash
-# Build (ALWAYS use scripts)
-./scripts/build_ios.sh                  # iOS IPA (App Store Connect)
-./scripts/build_android.sh apk          # Android APK
-./scripts/build_android.sh aab          # Android AAB
+# Build (no build scripts in repo — call flutter directly)
+flutter build appbundle --release       # Android AAB (Play Store)
+flutter build apk --release             # Android APK
+flutter build ipa                       # iOS IPA (see iOS build note below)
 
 # Run on devices
 flutter run -d "iPhone 16 Pro"          # iOS simulator
-flutter run -d "00008140-00186D0C0882201C" --release  # iPhone (MUST use --release)
+flutter run -d "00008160-0012548222A0000A" --release  # iPhone 18 Pro (MUST use --release)
 
 # Quality checks (MANDATORY before commits)
 flutter analyze                         # Must pass with no issues
@@ -34,8 +34,7 @@ log show --predicate 'subsystem == "com.ilsan-ycity.ilsanycityplus.VehicleLocati
 **Every commit must increment the build number** in `pubspec.yaml` (line ~19):
 - Format: `4.0.4+1` → `4.0.4+2`
 - Include updated `pubspec.yaml` in every commit
-
-**Current Version**: 4.0.4+1
+- The build number must stay above the latest Play Store versionCode (check Play Console before uploading)
 
 ## Architecture
 
@@ -92,6 +91,12 @@ User input → Provider → Service → HTTP API (parking server)
 ### iOS Code Signing
 - `CODE_SIGN_STYLE = Automatic` — **DO NOT MODIFY**
 - If signing issues occur: check Apple Developer Center, never edit project settings
+
+### Release Builds
+- **Android signing**: `android/app/upload-keystore.jks` is gitignored — copy it from the main checkout into a new worktree before `flutter build appbundle`
+- **iOS entitlements**: `RunnerRelease.entitlements` and `VehicleLocationWidgetRelease.entitlements` are gitignored — same, copy from the main checkout
+- **iOS build location**: building inside the Synology Drive folder fails CodeSign ("resource fork... detritus") — rsync the project outside the synced folder and build there
+- **Play Console inactivity**: Google flags the developer account as inactive if no update ships for months — publish an update at least once a quarter
 
 ### Important Configurations
 - **Bundle ID**: `com.ilsan-ycity.ilsanycityplus`
